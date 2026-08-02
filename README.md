@@ -99,6 +99,7 @@ Ein Token mit diesen Rechten genügt (Dashboard → My Profile → API Tokens):
 | Scope   | Permission      | Level | Wofür                                    |
 | ------- | --------------- | ----- | ---------------------------------------- |
 | Account | Workers Scripts | Edit  | Custom Domain + workers.dev-Hostname     |
+| Account | Workers R2 Storage | Edit | Terraform-State im R2-Bucket           |
 | Zone    | Zone            | Read  | Zonen-Zuordnung                          |
 | Zone    | DNS             | Edit  | Platzhalter-Records der Redirect-Domains |
 | Zone    | Single Redirect | Edit  | die 301-Regeln                           |
@@ -110,6 +111,12 @@ Ein Token mit diesen Rechten genügt (Dashboard → My Profile → API Tokens):
 
 Das Token wird nur als Umgebungsvariable gelesen und landet dadurch **nicht**
 im Terraform-State.
+
+Für den State-Bucket ist **kein zweites Credential** nötig: Cloudflare leitet
+die S3-Zugangsdaten aus demselben Token ab – Access Key ID ist die Token-ID,
+Secret Access Key der SHA-256-Hash des Token-Werts. Die reusable Workflows
+rechnen das zur Laufzeit aus, deshalb braucht das Config-Repo nur
+`CLOUDFLARE_API_TOKEN` und `CLOUDFLARE_ACCOUNT_ID`.
 
 ## Was automatisch passiert
 
@@ -192,5 +199,7 @@ doppelte Indexierung nur der `<link rel="canonical">`-Tag der Seite.
 
 Die Logik ist durch 32 `terraform test`-Fälle abgedeckt, `terraform validate`
 und CI laufen sauber. Der **erste Apply gegen ein echtes Cloudflare-Konto steht
-noch aus** – insbesondere der R2-Backend mit `use_lockfile` und die
-Token-Scopes sollten beim ersten Lauf bewusst beobachtet werden.
+gegen ein echtes Cloudflare-Konto appliedt, inklusive Übernahme einer
+bestehenden Workers Custom Domain per `import`. Der R2-Backend mit
+`use_lockfile` funktioniert (State-Locking greift). Der Weg über die reusable
+Workflows aus einem Config-Repo ist dagegen noch nicht scharf gelaufen.

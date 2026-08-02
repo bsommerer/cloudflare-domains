@@ -63,7 +63,9 @@ Settings → Secrets and variables → Actions:
 | ----------------------- | ------------------------------------------------------- |
 | `CLOUDFLARE_API_TOKEN`  | alle Engines (Rechte siehe jeweilige Engine-README)      |
 | `CLOUDFLARE_ACCOUNT_ID` | Account-ID – bleibt dadurch aus den Config-Dateien raus  |
-| `R2_ACCOUNT_ID`         | R2-Endpoint für den Terraform-State                      |
-| `R2_ACCESS_KEY_ID`      | R2-Token (Object Read & Write auf den State-Bucket)      |
-| `R2_SECRET_ACCESS_KEY`  | dito                                                     |
 | `RESEND_API_KEY`        | nur `contact-form-worker`                                |
+
+Für den Terraform-State braucht es **kein eigenes Credential**: Cloudflare
+leitet die S3-Zugangsdaten aus dem API-Token ab (Access Key ID = Token-ID,
+Secret = SHA-256 des Token-Werts). Der Workflow rechnet sich das zur Laufzeit
+aus – das Token muss dafür nur `Workers R2 Storage: Edit` haben.
