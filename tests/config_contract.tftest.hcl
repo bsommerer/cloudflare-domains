@@ -8,6 +8,8 @@ variables {
     "andere.de"    = "id-andere"
   }
 
+  workers = ["web-kunde-xy", "web-veraltet"]
+
   defaults = {
     domains = {
       redirectStatusCode = 308
@@ -20,7 +22,7 @@ variables {
       name = "Kunde XY"
       domains = {
         enabled         = true
-        pagesProject    = "web-kunde-xy"
+        workerName      = "web-kunde-xy"
         canonicalDomain = "kunde-xy.de"
         redirectDomains = ["www.kunde-xy.de", "kunde-xy.com"]
       }
@@ -46,7 +48,7 @@ run "unknown_capability_blocks_are_ignored" {
   }
 
   assert {
-    condition     = output.sites["kunde-xy"].pagesProject == "web-kunde-xy"
+    condition     = output.sites["kunde-xy"].workerName == "web-kunde-xy"
     error_message = "Der domains-Block muss korrekt extrahiert werden."
   }
 }
@@ -100,7 +102,7 @@ run "domains_block_disabled_skips_the_site" {
   variables {
     raw_sites = {
       "kunde-xy" = {
-        domains      = { enabled = false, pagesProject = "web-kunde-xy", canonicalDomain = "kunde-xy.de" }
+        domains      = { enabled = false, workerName = "web-kunde-xy", canonicalDomain = "kunde-xy.de" }
         contactForms = { "kunde-xy" = { recipients = ["kontakt@kunde-xy.de"] } }
       }
     }
@@ -137,7 +139,7 @@ run "site_level_enabled_false_disables_everything" {
     raw_sites = {
       "kunde-xy" = {
         enabled = false
-        domains = { enabled = true, pagesProject = "web-kunde-xy", canonicalDomain = "kunde-xy.de" }
+        domains = { enabled = true, workerName = "web-kunde-xy", canonicalDomain = "kunde-xy.de" }
       }
     }
   }
@@ -154,14 +156,14 @@ run "config_repo_wins_over_inline_sites" {
   variables {
     sites = {
       "kunde-xy" = {
-        pagesProject    = "web-veraltet"
+        workerName      = "web-veraltet"
         canonicalDomain = "andere.de"
       }
     }
   }
 
   assert {
-    condition     = output.sites["kunde-xy"].pagesProject == "web-kunde-xy"
+    condition     = output.sites["kunde-xy"].workerName == "web-kunde-xy"
     error_message = "Bei gleichem Slug gewinnt das Config-Repo gegen var.sites."
   }
 }

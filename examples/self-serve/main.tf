@@ -22,7 +22,7 @@ module "domains" {
 
   sites = {
     beispiel = {
-      pagesProject    = "web-beispiel"
+      workerName      = "beispiel"
       canonicalDomain = "beispiel.de"
 
       redirectDomains = [

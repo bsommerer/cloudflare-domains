@@ -3,6 +3,15 @@ variable "zones" {
   type        = map(string)
 }
 
+variable "workers" {
+  description = <<-EOT
+    Namen aller Worker-Scripts im Account. Dient nur dazu, einen Tippfehler in
+    `workerName` schon im Plan zu melden statt erst beim Apply.
+  EOT
+  type        = list(string)
+  default     = []
+}
+
 variable "raw_sites" {
   description = <<-EOT
     Die dekodierten Site-Dateien aus dem Config-Repo, als Slug -> Inhalt.

@@ -57,6 +57,18 @@ resource "terraform_data" "config" {
     }
 
     precondition {
+      condition     = length(local.findings.unknown_workers) == 0
+      error_message = <<-EOT
+        Diese Worker existieren nicht im Account ${var.account_id}:
+        ${join(", ", local.findings.unknown_workers)}.
+
+        Die Engine deployt keine Worker – sie verknüpft nur Domains mit
+        bereits vorhandenen. Bitte `workerName` prüfen (Tippfehler?) oder den
+        Worker zuerst per `wrangler deploy` ausrollen.
+      EOT
+    }
+
+    precondition {
       condition     = length(local.findings.invalid_status) == 0
       error_message = <<-EOT
         redirectStatusCode muss 301, 302, 307 oder 308 sein. Betroffene Sites:

@@ -14,24 +14,26 @@ variables {
     "other.de"        = "id-other-de"
   }
 
+  workers = ["web-alpha", "web-beta", "web-gamma", "web-delta"]
+
   sites = {
     alpha = {
-      pagesProject    = "web-alpha"
+      workerName      = "web-alpha"
       canonicalDomain = "example.co.uk"
       redirectDomains = ["www.example.co.uk"]
     }
     beta = {
-      pagesProject    = "web-beta"
+      workerName      = "web-beta"
       canonicalDomain = "example.com"
       redirectDomains = ["www.example.com", "deep.sub.example.com"]
     }
     gamma = {
-      pagesProject    = "web-gamma"
+      workerName      = "web-gamma"
       canonicalDomain = "other.de"
       redirectDomains = ["www.other.de", "legacy.shared.example"]
     }
     delta = {
-      pagesProject       = "web-delta"
+      workerName         = "web-delta"
       canonicalDomain    = "ample.com"
       redirectDomains    = ["OLD.Shared.Example"]
       redirectStatusCode = 308
@@ -132,13 +134,13 @@ run "opting_out_of_https_removes_only_that_zone" {
   variables {
     sites = {
       beta = {
-        pagesProject    = "web-beta"
+        workerName      = "web-beta"
         canonicalDomain = "example.com"
         redirectDomains = ["www.example.com"]
         alwaysUseHttps  = false
       }
       gamma = {
-        pagesProject    = "web-gamma"
+        workerName      = "web-gamma"
         canonicalDomain = "other.de"
         redirectDomains = []
       }

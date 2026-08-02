@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/bsommerer/cloudflare-domains/main/schema/domains.schema.json",
   "title": "cloudflare-domains capability block",
-  "description": "Der `domains`-Block einer Site-Datei im zentralen Config-Repo. Diese Engine liest ausschliesslich diesen Block; andere Top-Level-Keys gehoeren anderen Engines und werden ignoriert.",
+  "description": "Der `domains`-Block einer Site-Datei im zentralen Config-Repo. Verknuepft Domains mit einem Cloudflare-Worker. Diese Engine liest ausschliesslich diesen Block; andere Top-Level-Keys gehoeren anderen Engines und werden ignoriert.",
 
   "type": "object",
   "properties": {
@@ -19,7 +19,7 @@
     "domains": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["enabled", "pagesProject", "canonicalDomain"],
+      "required": ["enabled", "workerName", "canonicalDomain"],
 
       "properties": {
         "enabled": {
@@ -27,15 +27,20 @@
           "description": "false oder fehlend: diese Engine ueberspringt die Site."
         },
 
-        "pagesProject": {
+        "workerName": {
           "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9-]{0,57}[a-z0-9]$",
-          "description": "Name des bereits existierenden Cloudflare-Pages-Projekts."
+          "pattern": "^[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$",
+          "description": "Name des bereits deployten Cloudflare-Workers. Die Engine deployt keine Worker, sie verknuepft nur Domains damit."
+        },
+
+        "disableWorkersDev": {
+          "type": "boolean",
+          "description": "Schaltet den <name>.<subdomain>.workers.dev-Hostnamen ab, damit die Seite nicht zusaetzlich unter einer Cloudflare-Domain indexiert wird. Ohne Angabe wird der Hostname nicht angefasst."
         },
 
         "canonicalDomain": {
           "$ref": "#/$defs/hostname",
-          "description": "Die kanonische Domain. Wird als Custom Domain mit dem Pages-Projekt verknuepft; alles andere leitet hierauf um."
+          "description": "Die kanonische Domain. Wird als Workers Custom Domain mit dem Worker verknuepft; alles andere leitet hierauf um."
         },
 
         "redirectDomains": {
@@ -43,7 +48,7 @@
           "uniqueItems": true,
           "default": [],
           "items": { "$ref": "#/$defs/hostname" },
-          "description": "Domains, die per Redirect Rule auf canonicalDomain zeigen. Bekommen einen proxied Platzhalter-Record und werden NICHT mit dem Pages-Projekt verknuepft."
+          "description": "Domains, die per Redirect Rule auf canonicalDomain zeigen. Bekommen einen proxied Platzhalter-Record und werden NICHT mit dem Worker verknuepft."
         },
 
         "redirectStatusCode": {

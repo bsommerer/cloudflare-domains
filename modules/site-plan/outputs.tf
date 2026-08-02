@@ -38,6 +38,11 @@ output "managed_zones" {
   value       = local.managed_zones
 }
 
+output "workers_dev_disabled" {
+  description = "Worker, deren *.workers.dev-Hostname abgeschaltet werden soll (dedupliziert)."
+  value       = local.workers_dev_disabled
+}
+
 output "findings" {
   description = "Konfigurationsprobleme, die der Root als Precondition hart abbricht."
   value       = local.findings

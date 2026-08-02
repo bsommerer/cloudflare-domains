@@ -1,10 +1,9 @@
 output "sites" {
-  description = "Übersicht je Site: kanonische URL, Pages-Ziel und aktive Weiterleitungen."
+  description = "Übersicht je Site: kanonische URL, Worker und aktive Weiterleitungen."
   value = {
     for slug, s in local.sites : slug => {
-      canonical_url   = "https://${s.canonicalDomain}"
-      pages_project   = s.pagesProject
-      pages_subdomain = data.cloudflare_pages_project.this[slug].subdomain
+      canonical_url = "https://${s.canonicalDomain}"
+      worker        = s.workerName
       redirects = {
         for d in s.redirectDomains :
         d => "https://${s.canonicalDomain} (${s.redirectStatusCode})"
@@ -41,13 +40,12 @@ output "managed_zones" {
   value       = module.plan.managed_zones
 }
 
-output "pages_dev_hostnames" {
+output "workers_dev_disabled" {
   description = <<-EOT
-    Die pages.dev-Hostnamen der Projekte. Diese liegen in der Zone pages.dev,
-    die Cloudflare gehört – dafür lassen sich keine Redirect Rules anlegen.
-    Gegen doppelte Indexierung wirkt hier der canonical-Tag der Seite.
+    Worker, deren *.workers.dev-Hostname abgeschaltet wurde. Wird ein Worker
+    hier nicht gelistet, ist die Seite zusätzlich unter
+    `<name>.<subdomain>.workers.dev` erreichbar – dagegen wirkt dann nur der
+    canonical-Tag der Seite.
   EOT
-  value = {
-    for slug, p in data.cloudflare_pages_project.this : slug => p.subdomain
-  }
+  value       = local.workers_dev_disabled
 }

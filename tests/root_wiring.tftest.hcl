@@ -1,13 +1,9 @@
 # Prüft den Root: dass die Guards greifen und dass `for_each` über eine aus
-# dem Zonen-Lookup abgeleitete Map zur Plan-Zeit auflösbar ist. Cloudflare
-# wird gemockt und liefert dabei einen leeren Zonen-Bestand – jede Domain ist
-# also unzuordenbar, was genau der Fall ist, den terraform_data.zones abfängt.
+# dem Zonen-Lookup abgeleitete Map zur Plan-Zeit auflösbar ist.
 
-mock_provider "cloudflare" {
-  mock_data "cloudflare_pages_project" {
-    defaults = { subdomain = "mocked.pages.dev" }
-  }
-}
+# Beide Data Sources liefern unter dem Mock eine leere Liste – der Account
+# hat also weder Zonen noch Worker. Genau die Fälle, die die Guards abfangen.
+mock_provider "cloudflare" {}
 
 variables {
   account_id = "0123456789abcdef0123456789abcdef"
@@ -18,11 +14,16 @@ run "unmatched_domain_aborts_the_plan" {
 
   variables {
     sites = {
-      a = { pagesProject = "web-a", canonicalDomain = "gibtsnicht.example" }
+      a = { workerName = "web-a", canonicalDomain = "gibtsnicht.example" }
     }
   }
 
-  expect_failures = [terraform_data.zones]
+  # Die gemockte Worker-Liste ist leer, deshalb meldet der config-Guard
+  # zusaetzlich den unbekannten Worker.
+  expect_failures = [
+    terraform_data.zones,
+    terraform_data.config,
+  ]
 }
 
 run "empty_config_aborts_the_plan" {
@@ -40,8 +41,8 @@ run "duplicate_canonical_aborts_the_plan" {
 
   variables {
     sites = {
-      a = { pagesProject = "web-a", canonicalDomain = "kollision.example" }
-      b = { pagesProject = "web-b", canonicalDomain = "kollision.example" }
+      a = { workerName = "web-a", canonicalDomain = "kollision.example" }
+      b = { workerName = "web-b", canonicalDomain = "kollision.example" }
     }
   }
 

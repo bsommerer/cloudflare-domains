@@ -1,6 +1,6 @@
 variable "account_id" {
   description = <<-EOT
-    Cloudflare Account-ID, in der Pages-Projekt und Zonen liegen.
+    Cloudflare Account-ID, in der Worker und Zonen liegen.
     Dashboard -> rechte Spalte, oder `wrangler whoami`.
 
     In CI als `TF_VAR_account_id` aus dem Secret CLOUDFLARE_ACCOUNT_ID setzen,
@@ -48,8 +48,9 @@ variable "sites" {
   EOT
 
   type = map(object({
-    pagesProject        = string
+    workerName          = string
     canonicalDomain     = string
+    disableWorkersDev   = optional(bool)
     redirectDomains     = optional(list(string), [])
     redirectStatusCode  = optional(number, 301)
     preserveQueryString = optional(bool, true)

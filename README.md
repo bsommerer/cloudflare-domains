@@ -1,7 +1,7 @@
 # Cloudflare Domain-Setup als Code
 
-Verknüpft Domains mit Cloudflare-Pages-Projekten und leitet alle Nebendomains
-SEO-konform per 301 auf eine kanonische Domain um – DNS, Custom Domain,
+Verknüpft Domains mit Cloudflare-Workers und leitet alle Nebendomains
+SEO-konform per 301 auf eine kanonische Domain um – Custom Domain, DNS,
 Redirect Rules und `http → https` in einem `terraform apply`.
 
 **GitOps-first:** Eine Website hinzufügen heißt _eine JSON-Datei committen_.
@@ -25,13 +25,13 @@ sites/<slug>.json  ──►  modules/site-plan  ──►  Cloudflare-Ressource
 
 Die gesamte kniffelige Logik – Zonen-Zuordnung, Aggregation über Sites hinweg,
 Konfigurations-Guards – liegt in [`modules/site-plan`](modules/site-plan). Das
-Modul spricht mit **nichts**: es bildet Konfiguration plus Zonenliste auf einen
-Plan ab. Deshalb lässt es sich in [`tests/`](tests) per `terraform test`
+Modul spricht mit **nichts**: es bildet Konfiguration plus Zonen- und
+Worker-Liste auf einen Plan ab. Deshalb lässt es sich in [`tests/`](tests) per `terraform test`
 vollständig prüfen, ohne Cloudflare-Zugang und ohne Provider-Mocks. Der Root
 verdrahtet nur noch Plan → Ressourcen.
 
 ```bash
-terraform test        # 20 Tests, keine Credentials nötig
+terraform test        # 26 Tests, keine Credentials nötig
 ```
 
 ## Der Config-Vertrag
@@ -47,7 +47,7 @@ Engine liest `domains` und **ignoriert alles andere**:
 
   "domains": {
     "enabled": true,
-    "pagesProject": "web-kunde-xy",
+    "workerName": "kunde-xy",
     "canonicalDomain": "kunde-xy.de",
     "redirectDomains": ["www.kunde-xy.de", "kunde-xy.com", "www.kunde-xy.com"]
   },
@@ -66,7 +66,9 @@ Autorität über ihre eigenen Felder, das Config-Repo komponiert nur.
 
 - Die Domains liegen **bereits als Zone** bei Cloudflare (Nameserver-Wechsel
   abgeschlossen). Die Engine legt keine Zonen an – sie liest sie.
-- Die Pages-Projekte existieren bereits.
+- Die Worker sind **bereits deployt** (`wrangler deploy`). Die Engine deployt
+  keinen Code – sie verknüpft Domains mit vorhandenen Workern. Ein `workerName`
+  ohne passendes Script bricht schon den `plan` ab.
 - Terraform >= 1.7 (>= 1.10, wenn der R2-Backend mit `use_lockfile` genutzt wird).
 
 ## Lokal ausführen
@@ -84,13 +86,13 @@ terraform apply -var sites_dir=/pfad/zum/config-repo/sites
 
 Ein Token mit diesen Rechten genügt (Dashboard → My Profile → API Tokens):
 
-| Scope   | Permission       | Level | Wofür                          |
-| ------- | ---------------- | ----- | ------------------------------ |
-| Account | Cloudflare Pages | Edit  | Custom Domain am Projekt       |
-| Zone    | Zone             | Read  | Zonen-Zuordnung                |
-| Zone    | DNS              | Edit  | CNAME + Platzhalter-Records    |
-| Zone    | Single Redirect  | Edit  | die 301-Regeln                 |
-| Zone    | Zone Settings    | Edit  | `always_use_https`             |
+| Scope   | Permission      | Level | Wofür                                    |
+| ------- | --------------- | ----- | ---------------------------------------- |
+| Account | Workers Scripts | Edit  | Custom Domain + workers.dev-Hostname     |
+| Zone    | Zone            | Read  | Zonen-Zuordnung                          |
+| Zone    | DNS             | Edit  | Platzhalter-Records der Redirect-Domains |
+| Zone    | Single Redirect | Edit  | die 301-Regeln                           |
+| Zone    | Zone Settings   | Edit  | `always_use_https`                       |
 
 > **Single Redirect**, nicht *Config Rules*: Redirect Rules leben in der Phase
 > `http_request_dynamic_redirect`, für die Cloudflare genau dieses
@@ -101,13 +103,13 @@ im Terraform-State.
 
 ## Was automatisch passiert
 
-| Ressource                 | Zweck                                                            |
-| ------------------------- | ---------------------------------------------------------------- |
-| `cloudflare_dns_record`   | CNAME der kanonischen Domain auf `<projekt>.pages.dev` (proxied)  |
-| `cloudflare_pages_domain` | Verknüpfung der kanonischen Domain mit dem Pages-Projekt          |
-| `cloudflare_dns_record`   | Proxied Platzhalter-Record je Redirect-Domain                     |
-| `cloudflare_ruleset`      | **Ein** Redirect-Ruleset pro Zone, Pfad + Query bleiben erhalten  |
-| `cloudflare_zone_setting` | `always_use_https` = on, pro Zone dedupliziert                    |
+| Ressource                             | Zweck                                                            |
+| ------------------------------------- | ---------------------------------------------------------------- |
+| `cloudflare_workers_custom_domain`    | Kanonische Domain am Worker – legt ihren DNS-Record selbst an     |
+| `cloudflare_dns_record`               | Proxied Platzhalter-Record je Redirect-Domain                     |
+| `cloudflare_ruleset`                  | **Ein** Redirect-Ruleset pro Zone, Pfad + Query bleiben erhalten  |
+| `cloudflare_zone_setting`             | `always_use_https` = on, pro Zone dedupliziert                    |
+| `cloudflare_workers_script_subdomain` | optional: schaltet `*.workers.dev` ab                             |
 
 Die Zonen-Zuordnung passiert über **längste Suffix-Übereinstimmung**:
 `www.example.co.uk` landet korrekt in der Zone `example.co.uk`, und wenn sowohl
@@ -115,9 +117,10 @@ Die Zonen-Zuordnung passiert über **längste Suffix-Übereinstimmung**:
 spezifischere. Gehört eine Domain zu keiner Zone im Account, bricht schon der
 `plan` mit einer klaren Meldung ab.
 
-Weitere Guards, die den Plan hart abbrechen: dieselbe Domain in zwei Sites,
-eine Domain, die in Site A kanonisch und in Site B Weiterleitungsziel ist, eine
-Site, die ihre eigene kanonische Domain umleitet, und ungültige Status-Codes.
+Weitere Guards, die den Plan hart abbrechen: ein `workerName` ohne passendes
+Script im Account, dieselbe Domain in zwei Sites, eine Domain, die in Site A
+kanonisch und in Site B Weiterleitungsziel ist, eine Site, die ihre eigene
+kanonische Domain umleitet, und ungültige Status-Codes.
 
 ## Designentscheidungen
 
@@ -128,17 +131,21 @@ Ruleset mit zwei Regeln teilen – zwei Rulesets für dieselbe Zone und Phase
 kollidieren. Genau dafür existiert die Aggregationsstufe im Planer-Modul, und
 genau das prüft `tests/zone_matching.tftest.hcl`.
 
-**Warum keine `_redirects`-Datei?** Cloudflare Pages unterstützt darin
-[ausdrücklich keine Domain-Level-Redirects](https://developers.cloudflare.com/pages/configuration/redirects/)
-– die Datei matcht nur Pfade, nicht Hostnamen.
+**Warum Workers und nicht Pages?** Cloudflare steuert neue statische Projekte
+auf Workers Static Assets; Pages ist faktisch Legacy. Praktischer Vorteil hier:
+eine Workers Custom Domain legt ihren DNS-Record
+[selbst an](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/)
+– es braucht also keinen eigenen `cloudflare_dns_record` für die kanonische
+Domain. Und `*.workers.dev` lässt sich abschalten, was bei `*.pages.dev` nicht
+ging.
 
-**Warum keine Pages-Functions-Middleware?** Würde funktionieren, macht aber
-jeden Request zu einer Worker-Invocation und verlagert Infrastruktur in den
-Anwendungscode. Redirect Rules laufen an der Edge, bevor Pages überhaupt
+**Warum kein Redirect im Worker selbst?** Würde funktionieren, macht aber jeden
+Request zu einer Worker-Invocation und verlagert Infrastruktur in den
+Anwendungscode. Redirect Rules laufen an der Edge, bevor der Worker überhaupt
 angefragt wird – ohne Laufzeitkosten.
 
-**Warum bekommen Redirect-Domains einen Platzhalter-Record statt eines CNAME
-auf Pages?** Weil sie nie bei Pages ankommen sollen. `100::` stammt aus dem
+**Warum bekommen Redirect-Domains einen Platzhalter-Record statt einer eigenen
+Custom Domain?** Weil sie nie beim Worker ankommen sollen. `100::` stammt aus dem
 IPv6-Discard-Prefix (RFC 6666) und routet nirgendwohin; der Record existiert
 ausschließlich, damit der Request die Edge erreicht, wo die Redirect Rule
 greift. Das ist [Cloudflares dokumentiertes Vorgehen](https://developers.cloudflare.com/fundamentals/manage-domains/redirect-domain/)
@@ -158,16 +165,22 @@ Zone**. Eine dort von Hand angelegte Redirect Rule wird vom `apply`
 also: Regeln sichten und in die Site-Datei übernehmen, oder die Zone aus der
 Konfiguration heraushalten. Der `plan` zeigt es an – deshalb ihn immer lesen.
 
-## Bekannte Grenze: `*.pages.dev`
+## `*.workers.dev`
 
-Die Zone `pages.dev` gehört Cloudflare, nicht dir – dort lassen sich keine
-Redirect Rules anlegen. Gegen doppelte Indexierung wirkt hier der
-`<link rel="canonical">`-Tag der Seite. Wer das hart abstellen will, muss den
-Zugriff auf die pages.dev-Domain im Pages-Projekt selbst einschränken.
+Die Zone `workers.dev` gehört Cloudflare, nicht dir – dort lassen sich keine
+Redirect Rules anlegen. Anders als bei Pages kann der Hostname aber komplett
+abgeschaltet werden:
+
+```json
+"domains": { "workerName": "kunde-xy", "disableWorkersDev": true, … }
+```
+
+Ohne die Angabe fasst die Engine den Hostnamen nicht an – dann wirkt gegen
+doppelte Indexierung nur der `<link rel="canonical">`-Tag der Seite.
 
 ## Status
 
-Die Logik ist durch `terraform test` abgedeckt und `terraform validate` läuft
-sauber. Der **erste Apply gegen ein echtes Cloudflare-Konto steht noch aus** –
-insbesondere der R2-Backend mit `use_lockfile` und die Token-Scopes sollten
-beim ersten Lauf bewusst beobachtet werden.
+Die Logik ist durch 26 `terraform test`-Fälle abgedeckt, `terraform validate`
+und CI laufen sauber. Der **erste Apply gegen ein echtes Cloudflare-Konto steht
+noch aus** – insbesondere der R2-Backend mit `use_lockfile` und die
+Token-Scopes sollten beim ersten Lauf bewusst beobachtet werden.

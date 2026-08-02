@@ -18,7 +18,8 @@ locals {
   # case-insensitiv, das Zonen-Matching per `endswith()` wäre es nicht.
   from_dir = {
     for slug, s in local.selected : slug => {
-      pagesProject        = s.pagesProject
+      workerName          = s.workerName
+      disableWorkersDev   = try(s.disableWorkersDev, null)
       canonicalDomain     = lower(s.canonicalDomain)
       redirectDomains     = [for d in try(s.redirectDomains, []) : lower(d)]
       redirectStatusCode  = try(s.redirectStatusCode, 301)
@@ -29,7 +30,8 @@ locals {
 
   from_var = {
     for slug, s in var.sites : slug => {
-      pagesProject        = s.pagesProject
+      workerName          = s.workerName
+      disableWorkersDev   = try(s.disableWorkersDev, null)
       canonicalDomain     = lower(s.canonicalDomain)
       redirectDomains     = [for d in try(s.redirectDomains, []) : lower(d)]
       redirectStatusCode  = try(s.redirectStatusCode, 301)
@@ -149,6 +151,12 @@ locals {
   managed_zones = sort(distinct([
     for d, zn in local.zone_name_for : zn if zn != ""
   ]))
+
+  # Ein Worker kann mehrere Sites bedienen; die workers.dev-Abschaltung gilt
+  # aber dem Worker, nicht der Site – deshalb hier dedupliziert.
+  workers_dev_disabled = sort(distinct([
+    for slug, s in local.sites : s.workerName if s.disableWorkersDev == true
+  ]))
 }
 
 #############################################
@@ -174,8 +182,8 @@ locals {
       for d, slugs in local.redirect_claims : d if length(slugs) > 1
     ])
 
-    # Kanonisch in Site A, umgeleitet in Site B: bekäme sowohl einen CNAME auf
-    # Pages als auch einen Platzhalter-AAAA.
+    # Kanonisch in Site A, umgeleitet in Site B: bekäme sowohl eine Workers
+    # Custom Domain als auch einen Platzhalter-AAAA auf demselben Hostnamen.
     canonical_and_redirect = sort([
       for d in keys(local.canonical_claims) :
       d if contains(keys(local.redirect_claims), d)
@@ -186,6 +194,12 @@ locals {
       for slug, s in local.sites :
       slug if contains(s.redirectDomains, s.canonicalDomain)
     ])
+
+    # workerName zeigt auf kein Script im Account.
+    unknown_workers = sort(distinct([
+      for slug, s in local.sites :
+      s.workerName if !contains(var.workers, s.workerName)
+    ]))
 
     invalid_status = sort([
       for slug, s in local.sites :

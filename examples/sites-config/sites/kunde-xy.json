@@ -4,7 +4,7 @@
 
   "domains": {
     "enabled": true,
-    "pagesProject": "web-kunde-xy",
+    "workerName": "kunde-xy",
     "canonicalDomain": "kunde-xy.de",
     "redirectDomains": [
       "www.kunde-xy.de",

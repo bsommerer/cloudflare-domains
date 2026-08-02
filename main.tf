@@ -2,7 +2,7 @@
 # Lookups
 #############################################
 
-# Einmal für alle Sites – nicht pro Site. Voraussetzung des Moduls ist, dass
+# Einmal für alle Sites – nicht pro Site. Voraussetzung der Engine ist, dass
 # die Domains bereits bei Cloudflare liegen; Zonen werden gelesen, nicht
 # angelegt.
 data "cloudflare_zones" "all" {
@@ -10,11 +10,18 @@ data "cloudflare_zones" "all" {
   max_items = local.zone_page_size
 }
 
+# Nur zur Existenzprüfung: ein Tippfehler in `workerName` soll im Plan
+# auffallen, nicht erst beim Apply.
+data "cloudflare_workers_scripts" "all" {
+  account_id = var.account_id
+  max_items  = local.worker_page_size
+}
+
 #############################################
 # Planung
 #############################################
 
-# Reine Funktion ohne Provider-Zugriff: Konfiguration + Zonenliste -> Plan.
+# Reine Funktion ohne Provider-Zugriff: Konfiguration + Zonen + Worker -> Plan.
 # Die gesamte kniffelige Logik (Zonen-Zuordnung per längstem Suffix,
 # Aggregation über Sites hinweg) liegt hier und ist in tests/ ohne Cloudflare
 # vollständig abgedeckt.
@@ -22,48 +29,40 @@ module "plan" {
   source = "./modules/site-plan"
 
   zones     = { for z in data.cloudflare_zones.all.result : z.name => z.id }
+  workers   = [for w in data.cloudflare_workers_scripts.all.result : w.id]
   raw_sites = local.raw_sites
   defaults  = local.defaults
   sites     = var.sites
 }
 
-# Liefert das echte "<projekt>.pages.dev"-Ziel, statt es aus dem Projektnamen
-# zu raten – bei Namenskollisionen hängt Cloudflare ein Suffix an.
-data "cloudflare_pages_project" "this" {
-  for_each = local.sites
-
-  account_id   = var.account_id
-  project_name = each.value.pagesProject
-}
-
 #############################################
-# Kanonische Domain -> Pages
+# Kanonische Domain -> Worker
 #############################################
 
-# Cloudflare legt für eine Pages-Custom-Domain KEINEN DNS-Record an
-# (ausdrücklicher Hinweis in der Provider-Doku), deshalb hier explizit.
-# CNAME auf den Apex ist bei Cloudflare dank CNAME-Flattening zulässig.
-resource "cloudflare_dns_record" "canonical" {
+# Eine Workers Custom Domain legt ihren DNS-Record selbst an ("After you have
+# added the domain or subdomain, Cloudflare will create a new DNS record for
+# you") – anders als bei Pages gibt es hier also bewusst KEINEN eigenen
+# cloudflare_dns_record. Ein zusätzlicher Record würde die Custom Domain sogar
+# blockieren: sie lässt sich auf einem Hostnamen mit bestehendem CNAME nicht
+# anlegen.
+resource "cloudflare_workers_custom_domain" "canonical" {
   for_each = local.sites
 
-  zone_id = local.zone_id_for[each.value.canonicalDomain]
-  name    = each.value.canonicalDomain
-  type    = "CNAME"
-  content = data.cloudflare_pages_project.this[each.key].subdomain
-  proxied = true
-  ttl     = 1 # bei proxied Records erzwingt Cloudflare TTL "automatic"
-  comment = "Managed by Terraform - Pages: ${each.value.pagesProject}"
+  account_id = var.account_id
+  hostname   = each.value.canonicalDomain
+  service    = each.value.workerName
+  zone_id    = local.zone_id_for[each.value.canonicalDomain]
 }
 
-resource "cloudflare_pages_domain" "canonical" {
-  for_each = local.sites
+# Optional: den *.workers.dev-Hostnamen abschalten, damit die Seite nicht
+# zusätzlich unter einer Cloudflare-Domain indexiert wird. Nur verwaltet, wenn
+# `disableWorkersDev` in der Site-Datei gesetzt ist.
+resource "cloudflare_workers_script_subdomain" "canonical" {
+  for_each = toset(local.workers_dev_disabled)
 
-  account_id   = var.account_id
-  project_name = each.value.pagesProject
-  name         = each.value.canonicalDomain
-
-  # Ohne den DNS-Record bleibt die Domain-Validierung bei Cloudflare hängen.
-  depends_on = [cloudflare_dns_record.canonical]
+  account_id  = var.account_id
+  script_name = each.value
+  enabled     = false
 }
 
 #############################################
@@ -72,7 +71,7 @@ resource "cloudflare_pages_domain" "canonical" {
 
 # Proxied Platzhalter-Record: bringt den Request an die Edge, ohne dass ein
 # Origin existieren muss. Die Redirect Rule greift davor. Redirect-Domains
-# werden bewusst NICHT mit dem Pages-Projekt verknüpft.
+# werden bewusst NICHT mit dem Worker verknüpft.
 resource "cloudflare_dns_record" "redirect" {
   for_each = local.redirect_records
 
@@ -81,7 +80,7 @@ resource "cloudflare_dns_record" "redirect" {
   type    = "AAAA"
   content = var.placeholder_ipv6
   proxied = true
-  ttl     = 1
+  ttl     = 1 # bei proxied Records erzwingt Cloudflare TTL "automatic"
   comment = "Managed by Terraform - ${each.value.status_code} -> ${each.value.target}"
 }
 
