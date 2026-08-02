@@ -20,3 +20,6 @@ terraform.tfvars
 
 # Examples werden nur validiert, nicht deployt.
 examples/**/.terraform.lock.hcl
+
+# Einmalige Bestands-Uebernahme, deployment-spezifisch.
+/imports.tf
