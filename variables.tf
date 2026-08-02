@@ -52,6 +52,7 @@ variable "sites" {
     canonicalDomain     = string
     disableWorkersDev   = optional(bool)
     redirectDomains     = optional(list(string), [])
+    redirectWWW         = optional(bool, false)
     redirectStatusCode  = optional(number, 301)
     preserveQueryString = optional(bool, true)
     alwaysUseHttps      = optional(bool, true)

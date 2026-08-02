@@ -31,7 +31,7 @@ vollständig prüfen, ohne Cloudflare-Zugang und ohne Provider-Mocks. Der Root
 verdrahtet nur noch Plan → Ressourcen.
 
 ```bash
-terraform test        # 26 Tests, keine Credentials nötig
+terraform test        # 32 Tests, keine Credentials nötig
 ```
 
 ## Der Config-Vertrag
@@ -49,12 +49,22 @@ Engine liest `domains` und **ignoriert alles andere**:
     "enabled": true,
     "workerName": "kunde-xy",
     "canonicalDomain": "kunde-xy.de",
-    "redirectDomains": ["www.kunde-xy.de", "kunde-xy.com", "www.kunde-xy.com"]
+    "redirectDomains": ["kunde-xy.com"],
+    "redirectWWW": true
   },
 
   "contactForms": { "kunde-xy": { "recipients": ["kontakt@kunde-xy.de"] } }
 }
 ```
+
+`redirectWWW` ist eine Komfort-Option: sie ergänzt zu jeder Domain der Site die
+www-Variante als Weiterleitung – oben also `www.kunde-xy.de` und
+`www.kunde-xy.com`, ohne dass sie jemand tippt. Sie wirkt bewusst nur auf
+Domains, die der **Apex ihrer Zone** sind: aus einer Weiterleitung
+`alt.example.com` entsteht kein sinnloses `www.alt.example.com`. Bereits
+explizit gelistete www-Domains werden nicht verdoppelt, und ist die kanonische
+Domain selbst die www-Form, entsteht daraus keine Schleife. Am sinnvollsten
+steht die Option einmal in `_defaults.json` für alle Sites.
 
 Fehlt der `domains`-Block oder steht dort `"enabled": false`, überspringt diese
 Engine die Site folgenlos. Ein optionales `_defaults.json` wird unter jeden
@@ -180,7 +190,7 @@ doppelte Indexierung nur der `<link rel="canonical">`-Tag der Seite.
 
 ## Status
 
-Die Logik ist durch 26 `terraform test`-Fälle abgedeckt, `terraform validate`
+Die Logik ist durch 32 `terraform test`-Fälle abgedeckt, `terraform validate`
 und CI laufen sauber. Der **erste Apply gegen ein echtes Cloudflare-Konto steht
 noch aus** – insbesondere der R2-Backend mit `use_lockfile` und die
 Token-Scopes sollten beim ersten Lauf bewusst beobachtet werden.

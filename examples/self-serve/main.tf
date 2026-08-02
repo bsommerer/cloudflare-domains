@@ -25,11 +25,9 @@ module "domains" {
       workerName      = "beispiel"
       canonicalDomain = "beispiel.de"
 
-      redirectDomains = [
-        "www.beispiel.de",
-        "beispiel-alt.de",
-        "www.beispiel-alt.de",
-      ]
+      # redirectWWW ergänzt www.beispiel.de und www.beispiel-alt.de selbst.
+      redirectDomains = ["beispiel-alt.de"]
+      redirectWWW     = true
     }
   }
 }

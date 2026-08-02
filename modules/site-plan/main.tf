@@ -22,6 +22,7 @@ locals {
       disableWorkersDev   = try(s.disableWorkersDev, null)
       canonicalDomain     = lower(s.canonicalDomain)
       redirectDomains     = [for d in try(s.redirectDomains, []) : lower(d)]
+      redirectWWW         = try(s.redirectWWW, false)
       redirectStatusCode  = try(s.redirectStatusCode, 301)
       preserveQueryString = try(s.preserveQueryString, true)
       alwaysUseHttps      = try(s.alwaysUseHttps, true)
@@ -34,16 +35,17 @@ locals {
       disableWorkersDev   = try(s.disableWorkersDev, null)
       canonicalDomain     = lower(s.canonicalDomain)
       redirectDomains     = [for d in try(s.redirectDomains, []) : lower(d)]
+      redirectWWW         = try(s.redirectWWW, false)
       redirectStatusCode  = try(s.redirectStatusCode, 301)
       preserveQueryString = try(s.preserveQueryString, true)
       alwaysUseHttps      = try(s.alwaysUseHttps, true)
     }
   }
 
-  sites = merge(local.from_var, local.from_dir)
+  sites_declared = merge(local.from_var, local.from_dir)
 
-  all_domains = distinct(flatten([
-    for slug, s in local.sites : concat([s.canonicalDomain], s.redirectDomains)
+  declared_domains = distinct(flatten([
+    for slug, s in local.sites_declared : concat([s.canonicalDomain], s.redirectDomains)
   ]))
 }
 
@@ -53,6 +55,16 @@ locals {
 
 locals {
   zone_ids_by_name = { for name, id in var.zones : lower(name) => id }
+
+  # Die Zuordnung läuft über eine *Obermenge*: alle deklarierten Domains plus
+  # jeden denkbaren www-Kandidaten. Grund ist die Reihenfolge – ob ein
+  # www-Kandidat überhaupt erzeugt wird, hängt davon ab, ob seine Basis der
+  # Apex ihrer Zone ist, und das weiß man erst nach dem Matching. Ein Durchlauf
+  # über die Obermenge löst das, ohne den Ausdruck zu duplizieren.
+  candidate_domains = distinct(concat(
+    local.declared_domains,
+    [for d in local.declared_domains : "www.${d}" if !startswith(d, "www.")]
+  ))
 
   # Jeder Hostname gehört in die *spezifischste* Zone, auf die er passt:
   # "www.example.co.uk" -> Zone "example.co.uk", und existiert zusätzlich eine
@@ -65,16 +77,47 @@ locals {
   # lexikografische Sortierung exakt der Sortierung nach Länge entspricht –
   # HCL hat kein sort_by().
   zone_matches = {
-    for d in local.all_domains : d => reverse(sort([
+    for d in local.candidate_domains : d => reverse(sort([
       for zn in keys(local.zone_ids_by_name) :
       format("%03d|%s", length(zn), zn)
       if d == zn || endswith(d, ".${zn}")
     ]))
   }
 
-  zone_name_for = {
+  zone_name_for_candidates = {
     for d, matches in local.zone_matches :
     d => length(matches) > 0 ? split("|", matches[0])[1] : ""
+  }
+}
+
+#############################################
+# 3. redirectWWW auflösen
+#############################################
+
+# Komfort-Option: ergänzt zu jeder Domain der Site die www-Variante als
+# Weiterleitung. Bewusst nur für Domains, die der *Apex ihrer Zone* sind –
+# sonst entstünde aus einer Weiterleitung "alt.example.com" auch noch ein
+# sinnloses "www.alt.example.com".
+locals {
+  sites = {
+    for slug, s in local.sites_declared : slug => merge(s, {
+      redirectDomains = distinct(concat(s.redirectDomains, s.redirectWWW ? [
+        for d in concat([s.canonicalDomain], s.redirectDomains) : "www.${d}"
+        if !startswith(d, "www.")
+        && local.zone_name_for_candidates[d] == d
+        && "www.${d}" != s.canonicalDomain
+      ] : []))
+    })
+  }
+
+  all_domains = distinct(flatten([
+    for slug, s in local.sites : concat([s.canonicalDomain], s.redirectDomains)
+  ]))
+
+  # Auf die tatsächlich verwendeten Domains eindampfen – sonst tauchten
+  # ungenutzte www-Kandidaten in den Outputs und in `unmatched_domains` auf.
+  zone_name_for = {
+    for d in local.all_domains : d => local.zone_name_for_candidates[d]
   }
 
   # `try()` statt direkter Indizierung: eine nicht zugeordnete Domain soll die
@@ -86,7 +129,7 @@ locals {
 }
 
 #############################################
-# 3. Aggregation über ALLE Sites hinweg
+# 4. Aggregation über ALLE Sites hinweg
 #############################################
 
 # Cloudflare erlaubt pro Zone und Phase genau ein Entry-Point-Ruleset ("Each
@@ -160,7 +203,7 @@ locals {
 }
 
 #############################################
-# 4. Befunde für die Guards im Root
+# 5. Befunde für die Guards im Root
 #############################################
 
 locals {

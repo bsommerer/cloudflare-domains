@@ -51,6 +51,13 @@
           "description": "Domains, die per Redirect Rule auf canonicalDomain zeigen. Bekommen einen proxied Platzhalter-Record und werden NICHT mit dem Worker verknuepft."
         },
 
+        "redirectWWW": {
+          "type": "boolean",
+          "default": false,
+          "description": "Komfort-Option: ergaenzt zu jeder Domain der Site automatisch die www-Variante als Weiterleitung. Wirkt nur auf Domains, die der Apex ihrer Zone sind, und erzeugt nichts doppelt.",
+          "$comment": "Laesst sich sinnvoll in _defaults.json fuer alle Sites setzen."
+        },
+
         "redirectStatusCode": {
           "type": "integer",
           "enum": [301, 302, 307, 308],
