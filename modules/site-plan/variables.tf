@@ -12,6 +12,17 @@ variable "workers" {
   default     = []
 }
 
+variable "existing_custom_domains" {
+  description = <<-EOT
+    Bereits im Account vorhandene Workers Custom Domains als
+    Hostname -> unveränderliche Domain-ID. Grundlage für die Bestandsübernahme:
+    Wer eine Domain vor der Engine von Hand verknüpft hat, soll sie per
+    `import` übernehmen können, statt am "existiert bereits" zu scheitern.
+  EOT
+  type        = map(string)
+  default     = {}
+}
+
 variable "raw_sites" {
   description = <<-EOT
     Die dekodierten Site-Dateien aus dem Config-Repo, als Slug -> Inhalt.

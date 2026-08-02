@@ -43,6 +43,15 @@ output "workers_dev_disabled" {
   value       = local.workers_dev_disabled
 }
 
+output "custom_domain_adoptions" {
+  description = <<-EOT
+    Slug -> ID der bereits bestehenden Workers Custom Domain. Nur Sites, deren
+    kanonische Domain im Account schon verknüpft ist; alle anderen legt die
+    Engine regulär an.
+  EOT
+  value       = local.custom_domain_adoptions
+}
+
 output "findings" {
   description = "Konfigurationsprobleme, die der Root als Precondition hart abbricht."
   value       = local.findings

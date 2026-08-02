@@ -31,7 +31,7 @@ vollständig prüfen, ohne Cloudflare-Zugang und ohne Provider-Mocks. Der Root
 verdrahtet nur noch Plan → Ressourcen.
 
 ```bash
-terraform test        # 32 Tests, keine Credentials nötig
+terraform test        # 37 Tests, keine Credentials nötig
 ```
 
 ## Der Config-Vertrag
@@ -173,6 +173,32 @@ jeden Request auf `/` werfen. Die Expression
 `concat("https://…", http.request.uri.path)` erhält den Pfad, `preserve_query_string`
 den Query-String.
 
+## Bestandsübernahme
+
+Eine Website, die schon läuft, wandert ohne manuellen Schritt in die Engine.
+Ist die kanonische Domain bereits von Hand als Workers Custom Domain verknüpft,
+würde ein zweites Anlegen an Cloudflare scheitern – deshalb liest die Engine die
+vorhandenen Verknüpfungen und **importiert** sie:
+
+```hcl
+import {
+  for_each = local.custom_domain_adoptions
+  to       = cloudflare_workers_custom_domain.canonical[each.key]
+  id       = "${var.account_id}/${each.value}"
+}
+```
+
+Migration einer bestehenden Seite ist damit ein reiner Config-PR. Drei Details:
+
+- Übernommen wird allein anhand des **Hostnamens**. Hängt dort ein anderer
+  Worker als konfiguriert, zeigt der `plan` die Umstellung als Änderung an –
+  sichtbarer, als sie am State vorbei passieren zu lassen.
+- Nur die **kanonische** Domain. Eine Redirect-Domain mit alter
+  Worker-Verknüpfung wird nicht importiert; sie braucht Platzhalter-Record und
+  Regel. Die alte Verknüpfung im Dashboard lösen, sonst gewinnt sie.
+- Der Block bleibt dauerhaft stehen: liegt die Ressource im State, ist er ein
+  No-Op.
+
 ## Bekannte Grenze: bestehende Redirect Rules
 
 Weil Cloudflare pro Zone und Phase nur ein Entry-Point-Ruleset zulässt,
@@ -197,9 +223,11 @@ doppelte Indexierung nur der `<link rel="canonical">`-Tag der Seite.
 
 ## Status
 
-Die Logik ist durch 32 `terraform test`-Fälle abgedeckt, `terraform validate`
-und CI laufen sauber. Der **erste Apply gegen ein echtes Cloudflare-Konto steht
-gegen ein echtes Cloudflare-Konto appliedt, inklusive Übernahme einer
-bestehenden Workers Custom Domain per `import`. Der R2-Backend mit
-`use_lockfile` funktioniert (State-Locking greift). Der Weg über die reusable
-Workflows aus einem Config-Repo ist dagegen noch nicht scharf gelaufen.
+Die Logik ist durch 37 `terraform test`-Fälle abgedeckt, `terraform validate`
+und CI laufen sauber.
+
+In Produktion gelaufen: der erste Apply gegen ein echtes Cloudflare-Konto
+inklusive Übernahme einer bestehenden Workers Custom Domain, der R2-Backend mit
+`use_lockfile` (State-Locking greift) und der komplette GitOps-Weg über die
+reusable Workflows aus einem Config-Repo – PR mit `plan`-Kommentar, Merge,
+`apply`.

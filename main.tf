@@ -17,6 +17,13 @@ data "cloudflare_workers_scripts" "all" {
   max_items  = local.worker_page_size
 }
 
+# Grundlage der Bestandsübernahme: schon von Hand verknüpfte Custom Domains
+# werden importiert statt neu angelegt (siehe `import`-Block unten).
+data "cloudflare_workers_custom_domains" "all" {
+  account_id = var.account_id
+  max_items  = local.custom_domain_page_size
+}
+
 #############################################
 # Planung
 #############################################
@@ -33,6 +40,10 @@ module "plan" {
   raw_sites = local.raw_sites
   defaults  = local.defaults
   sites     = var.sites
+
+  existing_custom_domains = {
+    for d in data.cloudflare_workers_custom_domains.all.result : lower(d.hostname) => d.id
+  }
 }
 
 #############################################
@@ -52,6 +63,20 @@ resource "cloudflare_workers_custom_domain" "canonical" {
   hostname   = each.value.canonicalDomain
   service    = each.value.workerName
   zone_id    = local.zone_id_for[each.value.canonicalDomain]
+}
+
+# Bestandsübernahme: eine kanonische Domain, die schon von Hand mit einem Worker
+# verknüpft ist, wird in den State geholt statt neu angelegt – Cloudflare lehnt
+# ein zweites Anlegen desselben Hostnamens ab. Damit ist die Migration einer
+# bestehenden Seite ein reiner Config-PR, ohne manuellen `terraform import`.
+#
+# Der Block bleibt dauerhaft stehen: für alles, was bereits im State liegt, ist
+# er wirkungslos.
+import {
+  for_each = local.custom_domain_adoptions
+
+  to = cloudflare_workers_custom_domain.canonical[each.key]
+  id = "${var.account_id}/${each.value}"
 }
 
 # Optional: den *.workers.dev-Hostnamen abschalten, damit die Seite nicht

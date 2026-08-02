@@ -203,6 +203,28 @@ locals {
 }
 
 #############################################
+# 4b. Bestandsübernahme
+#############################################
+
+# Eine kanonische Domain, die schon von Hand mit einem Worker verknüpft wurde,
+# soll übernommen und nicht neu angelegt werden – ein zweites Anlegen desselben
+# Hostnamens lehnt Cloudflare ab. Der Root erzeugt daraus `import`-Blöcke.
+#
+# Übernommen wird allein anhand des Hostnamens, bewusst auch dann, wenn dort ein
+# ANDERER Worker hängt: dann zeigt der Plan die Umstellung als sichtbare
+# Änderung an. Das ist deutlich transparenter, als sie am State vorbei
+# passieren zu lassen.
+#
+# Steht die Ressource bereits im State, ist der `import`-Block ein No-Op –
+# der Block darf also dauerhaft stehen bleiben.
+locals {
+  custom_domain_adoptions = {
+    for slug, s in local.sites : slug => var.existing_custom_domains[s.canonicalDomain]
+    if contains(keys(var.existing_custom_domains), s.canonicalDomain)
+  }
+}
+
+#############################################
 # 5. Befunde für die Guards im Root
 #############################################
 
