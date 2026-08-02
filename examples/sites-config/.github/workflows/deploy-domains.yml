@@ -1,0 +1,25 @@
+name: Deploy domains
+
+# Bei Push auf main: wendet sites/ auf Cloudflare an (DNS, Pages-Custom-Domains,
+# Redirect Rules, always_use_https).
+#
+# Bewusst OHNE paths-Filter: eine Site-Datei kann mehrere Engines betreffen,
+# und ein Terraform-Apply ohne Änderung ist ein billiger No-Op. Ein Filter, der
+# die falsche Änderung durchrutschen lässt, ist teurer.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  domains:
+    uses: bsommerer/cloudflare-domains/.github/workflows/apply.yml@v1
+    with:
+      state_bucket: tfstate
+    secrets:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}

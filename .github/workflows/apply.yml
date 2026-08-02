@@ -1,0 +1,129 @@
+name: Apply sites (reusable)
+
+# Reusable Workflow für das zentrale Config-Repo: wendet dessen `sites/` auf
+# Cloudflare an. GitOps-Quelle der Wahrheit ist damit das Config-Repo, nicht
+# dieses Repo – die Engine deployt nichts von sich aus.
+#
+# Aufruf aus dem Config-Repo (.github/workflows/deploy-domains.yml):
+#   on:
+#     push:
+#       branches: [main]
+#       paths: ['sites/**']
+#   jobs:
+#     domains:
+#       uses: bsommerer/cloudflare-domains/.github/workflows/apply.yml@v1
+#       with:
+#         state_bucket: tfstate
+#       secrets:
+#         CLOUDFLARE_API_TOKEN:  ${{ secrets.CLOUDFLARE_API_TOKEN }}
+#         CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+#         R2_ACCOUNT_ID:         ${{ secrets.R2_ACCOUNT_ID }}
+#         R2_ACCESS_KEY_ID:      ${{ secrets.R2_ACCESS_KEY_ID }}
+#         R2_SECRET_ACCESS_KEY:  ${{ secrets.R2_SECRET_ACCESS_KEY }}
+
+on:
+  workflow_call:
+    inputs:
+      engine_ref:
+        description: Git-Ref (Tag/Branch) der Engine, die angewendet wird
+        type: string
+        default: main
+      sites_dir:
+        description: Verzeichnis mit den Site-Dateien im Config-Repo
+        type: string
+        default: sites
+      state_bucket:
+        description: R2-Bucket für den Terraform-State
+        type: string
+        required: true
+      state_key:
+        description: Objekt-Key des States im Bucket
+        type: string
+        default: cloudflare-domains.tfstate
+      environment:
+        description: GitHub-Environment für den Apply-Job (z. B. für ein Approval-Gate)
+        type: string
+        default: ""
+    secrets:
+      CLOUDFLARE_API_TOKEN:
+        required: true
+      CLOUDFLARE_ACCOUNT_ID:
+        required: true
+      R2_ACCOUNT_ID:
+        required: true
+      R2_ACCESS_KEY_ID:
+        required: true
+      R2_SECRET_ACCESS_KEY:
+        required: true
+
+# Zwei parallele Applies würden sich um denselben State streiten.
+concurrency:
+  group: cloudflare-domains-apply
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      TF_VAR_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      AWS_ENDPOINT_URL_S3: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+
+    steps:
+      - name: Config-Repo auschecken (Caller)
+        uses: actions/checkout@v4
+        with:
+          path: config
+
+      - name: Engine auschecken
+        uses: actions/checkout@v4
+        with:
+          repository: bsommerer/cloudflare-domains
+          ref: ${{ inputs.engine_ref }}
+          path: engine
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Backend einsetzen
+        run: cp engine/ci/backend.tf engine/backend.tf
+
+      - name: Init
+        working-directory: engine
+        run: |
+          terraform init -input=false \
+            -backend-config="bucket=${{ inputs.state_bucket }}" \
+            -backend-config="key=${{ inputs.state_key }}"
+
+      # Erst planen, dann genau diesen Plan anwenden. Ohne die Plan-Datei
+      # könnte zwischen Plan und Apply etwas anderes passieren.
+      - name: Plan
+        working-directory: engine
+        env:
+          TF_VAR_sites_dir: ${{ github.workspace }}/config/${{ inputs.sites_dir }}
+        run: terraform plan -input=false -no-color -out=tfplan
+
+      - name: Apply
+        working-directory: engine
+        env:
+          TF_VAR_sites_dir: ${{ github.workspace }}/config/${{ inputs.sites_dir }}
+        run: terraform apply -input=false -no-color tfplan
+
+      - name: Ergebnis in die Job-Summary
+        if: success()
+        working-directory: engine
+        env:
+          TF_VAR_sites_dir: ${{ github.workspace }}/config/${{ inputs.sites_dir }}
+        run: |
+          {
+            echo "### cloudflare-domains – angewendet"
+            echo ""
+            echo '```json'
+            terraform output -json sites
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/bsommerer/cloudflare-domains/main/schema/domains.schema.json",
+  "title": "cloudflare-domains capability block",
+  "description": "Der `domains`-Block einer Site-Datei im zentralen Config-Repo. Diese Engine liest ausschliesslich diesen Block; andere Top-Level-Keys gehoeren anderen Engines und werden ignoriert.",
+
+  "type": "object",
+  "properties": {
+    "domains": { "$ref": "#/$defs/domains" }
+  },
+
+  "$defs": {
+    "hostname": {
+      "type": "string",
+      "pattern": "^(?!-)[a-zA-Z0-9-]{1,63}(?<!-)(\\.(?!-)[a-zA-Z0-9-]{1,63}(?<!-))+$",
+      "description": "Voll qualifizierter Hostname ohne Schema und ohne abschliessenden Punkt."
+    },
+
+    "domains": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "pagesProject", "canonicalDomain"],
+
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "false oder fehlend: diese Engine ueberspringt die Site."
+        },
+
+        "pagesProject": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{0,57}[a-z0-9]$",
+          "description": "Name des bereits existierenden Cloudflare-Pages-Projekts."
+        },
+
+        "canonicalDomain": {
+          "$ref": "#/$defs/hostname",
+          "description": "Die kanonische Domain. Wird als Custom Domain mit dem Pages-Projekt verknuepft; alles andere leitet hierauf um."
+        },
+
+        "redirectDomains": {
+          "type": "array",
+          "uniqueItems": true,
+          "default": [],
+          "items": { "$ref": "#/$defs/hostname" },
+          "description": "Domains, die per Redirect Rule auf canonicalDomain zeigen. Bekommen einen proxied Platzhalter-Record und werden NICHT mit dem Pages-Projekt verknuepft."
+        },
+
+        "redirectStatusCode": {
+          "type": "integer",
+          "enum": [301, 302, 307, 308],
+          "default": 301,
+          "description": "301 = permanent, uebertraegt Link-Equity."
+        },
+
+        "preserveQueryString": {
+          "type": "boolean",
+          "default": true,
+          "description": "Query-String bei der Weiterleitung erhalten. Der Pfad bleibt immer erhalten."
+        },
+
+        "alwaysUseHttps": {
+          "type": "boolean",
+          "default": true,
+          "description": "Setzt das Zone-Setting always_use_https auf 'on' fuer alle Zonen dieser Site."
+        }
+      }
+    }
+  }
+}

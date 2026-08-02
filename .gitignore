@@ -1,0 +1,22 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+override.tf
+override_*.tf
+*_override.tf
+.terraformrc
+terraform.rc
+tfplan
+
+# Wird von den reusable Workflows aus ci/backend.tf erzeugt.
+/backend.tf
+
+# Die Konfiguration lebt im Config-Repo, nicht hier.
+*.auto.tfvars
+*.auto.tfvars.json
+terraform.tfvars
+
+# Examples werden nur validiert, nicht deployt.
+examples/**/.terraform.lock.hcl

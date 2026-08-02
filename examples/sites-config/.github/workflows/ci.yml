@@ -1,0 +1,26 @@
+name: CI
+
+# Prüft bei jedem PR die Site-Dateien gegen jede Engine – ohne zu deployen.
+# Eine neue Engine hinzufügen heißt: einen Job ergänzen.
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  domains:
+    uses: bsommerer/cloudflare-domains/.github/workflows/validate.yml@v1
+    permissions:
+      contents: read
+      pull-requests: write
+    with:
+      state_bucket: tfstate
+    secrets:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+
+  contact-form:
+    uses: bsommerer/contact-form-worker/.github/workflows/validate.yml@main

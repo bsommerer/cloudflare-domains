@@ -1,0 +1,23 @@
+{
+  "name": "Kunde XY",
+  "enabled": true,
+
+  "domains": {
+    "enabled": true,
+    "pagesProject": "web-kunde-xy",
+    "canonicalDomain": "kunde-xy.de",
+    "redirectDomains": [
+      "www.kunde-xy.de",
+      "kunde-xy.com",
+      "www.kunde-xy.com"
+    ]
+  },
+
+  "contactForms": {
+    "kunde-xy": {
+      "recipients": ["kontakt@kunde-xy.de"],
+      "fromName": "Kunde XY",
+      "turnstile": true
+    }
+  }
+}

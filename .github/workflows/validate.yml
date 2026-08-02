@@ -1,0 +1,142 @@
+name: Validate sites (reusable)
+
+# Reusable Workflow für das zentrale Config-Repo: prüft dessen `sites/` gegen
+# diese Engine und zeigt den `terraform plan` als PR-Kommentar – ohne etwas zu
+# verändern.
+#
+# Aufruf aus dem Config-Repo (.github/workflows/ci.yml):
+#   on:
+#     pull_request:
+#   jobs:
+#     domains:
+#       uses: bsommerer/cloudflare-domains/.github/workflows/validate.yml@v1
+#       permissions:
+#         contents: read
+#         pull-requests: write
+#       with:
+#         state_bucket: tfstate
+#       secrets:
+#         CLOUDFLARE_API_TOKEN:  ${{ secrets.CLOUDFLARE_API_TOKEN }}
+#         CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+#         R2_ACCOUNT_ID:         ${{ secrets.R2_ACCOUNT_ID }}
+#         R2_ACCESS_KEY_ID:      ${{ secrets.R2_ACCESS_KEY_ID }}
+#         R2_SECRET_ACCESS_KEY:  ${{ secrets.R2_SECRET_ACCESS_KEY }}
+
+on:
+  workflow_call:
+    inputs:
+      engine_ref:
+        description: Git-Ref (Tag/Branch) der Engine, gegen die geprüft wird
+        type: string
+        default: main
+      sites_dir:
+        description: Verzeichnis mit den Site-Dateien im Config-Repo
+        type: string
+        default: sites
+      state_bucket:
+        description: R2-Bucket für den Terraform-State
+        type: string
+        required: true
+      state_key:
+        description: Objekt-Key des States im Bucket
+        type: string
+        default: cloudflare-domains.tfstate
+    secrets:
+      CLOUDFLARE_API_TOKEN:
+        required: true
+      CLOUDFLARE_ACCOUNT_ID:
+        required: true
+      R2_ACCOUNT_ID:
+        required: true
+      R2_ACCESS_KEY_ID:
+        required: true
+      R2_SECRET_ACCESS_KEY:
+        required: true
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Config-Repo auschecken (Caller)
+        uses: actions/checkout@v4
+        with:
+          path: config
+
+      - name: Engine auschecken
+        uses: actions/checkout@v4
+        with:
+          repository: bsommerer/cloudflare-domains
+          ref: ${{ inputs.engine_ref }}
+          path: engine
+
+      # Schnelles, credential-freies Feedback: ein Tippfehler im JSON soll den
+      # PR abbrechen, bevor überhaupt jemand mit Cloudflare spricht.
+      - name: JSON-Schema prüfen
+        working-directory: config
+        run: |
+          shopt -s nullglob
+          files=("${{ inputs.sites_dir }}"/*.json)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "Keine Site-Dateien in ${{ inputs.sites_dir }}/ gefunden." >&2
+            exit 1
+          fi
+          for f in "${files[@]}"; do
+            [ "$(basename "$f")" = "_defaults.json" ] && continue
+            echo "-> $f"
+            npx --yes ajv-cli@5 validate \
+              --spec=draft2020 --strict=false \
+              -s ../engine/schema/domains.schema.json -d "$f"
+          done
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Backend einsetzen
+        run: cp engine/ci/backend.tf engine/backend.tf
+
+      - name: Init
+        working-directory: engine
+        env:
+          AWS_ENDPOINT_URL_S3: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          terraform init -input=false \
+            -backend-config="bucket=${{ inputs.state_bucket }}" \
+            -backend-config="key=${{ inputs.state_key }}"
+
+      - name: Plan
+        id: plan
+        working-directory: engine
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TF_VAR_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          TF_VAR_sites_dir: ${{ github.workspace }}/config/${{ inputs.sites_dir }}
+          AWS_ENDPOINT_URL_S3: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          set -o pipefail
+          terraform plan -input=false -lock=false -no-color 2>&1 | tee "${RUNNER_TEMP}/plan.txt"
+
+      - name: Plan als PR-Kommentar
+        if: always() && github.event_name == 'pull_request'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PLAN=$(tail -c 60000 "${RUNNER_TEMP}/plan.txt")
+          {
+            echo "### Terraform-Plan – cloudflare-domains"
+            echo ""
+            echo "Ergebnis: \`${{ steps.plan.outcome }}\`"
+            echo ""
+            echo '```terraform'
+            echo "$PLAN"
+            echo '```'
+          } > "${RUNNER_TEMP}/comment.md"
+          cat "${RUNNER_TEMP}/comment.md" >> "$GITHUB_STEP_SUMMARY"
+          gh pr comment "${{ github.event.pull_request.number }}" \
+            --repo "${{ github.repository }}" \
+            --body-file "${RUNNER_TEMP}/comment.md"

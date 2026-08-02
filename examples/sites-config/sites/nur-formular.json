@@ -1,0 +1,14 @@
+{
+  "name": "Website ohne DNS-Verwaltung",
+  "enabled": true,
+
+  "//": "Kein domains-Block: die DNS dieser Site liegt woanders. Die Domains-Engine überspringt sie folgenlos, die Contact-Form-Engine ist trotzdem zuständig.",
+
+  "contactForms": {
+    "nur-formular": {
+      "recipients": ["info@fremde-domain.de"],
+      "allowedOrigins": ["https://fremde-domain.de"],
+      "turnstile": true
+    }
+  }
+}

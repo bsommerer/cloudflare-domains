@@ -1,0 +1,53 @@
+name: CI
+
+# CI der Engine selbst. Kommt ohne Cloudflare-Zugang aus: die gesamte Logik
+# liegt im reinen Planer-Modul und wird von `terraform test` ohne Provider
+# geprüft.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_call:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Format
+        run: terraform fmt -check -recursive -diff
+
+      - name: Init (ohne Backend, ohne Provider-Zugriff)
+        run: terraform init -backend=false -input=false
+
+      - name: Validate
+        run: terraform validate
+
+      - name: Tests
+        run: terraform test
+
+      - name: Validate examples
+        run: |
+          for dir in examples/*/; do
+            [ -f "$dir/main.tf" ] || continue
+            echo "::group::$dir"
+            terraform -chdir="$dir" init -backend=false -input=false
+            terraform -chdir="$dir" validate
+            echo "::endgroup::"
+          done
+
+      - name: JSON-Schema gegen die Beispiel-Sites
+        run: |
+          for f in examples/sites-config/sites/*.json; do
+            [ "$(basename "$f")" = "_defaults.json" ] && continue
+            npx --yes ajv-cli@5 validate \
+              --spec=draft2020 --strict=false \
+              -s schema/domains.schema.json -d "$f"
+          done
