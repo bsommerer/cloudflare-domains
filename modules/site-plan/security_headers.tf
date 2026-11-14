@@ -168,13 +168,21 @@ locals {
   # fremdes Ruleset anderer Zonen bleibt unangetastet.
   security_ruleset_candidates = {
     for zn, _ in local.security_rules_by_zone : zn => [
-      for r in lookup(var.existing_rulesets, zn, []) : r.id
+      for r in lookup(var.existing_rulesets, zn, []) : r
       if r.kind == "zone" && r.phase == "http_response_headers_transform"
     ]
   }
 
   security_ruleset_adoptions = {
-    for zn, ids in local.security_ruleset_candidates : zn => ids[0] if length(ids) > 0
+    for zn, rs in local.security_ruleset_candidates : zn => rs[0].id if length(rs) > 0
+  }
+
+  # Wie bei den Redirects bleibt der Name eines übernommenen Rulesets erhalten:
+  # `name` erzwingt beim Provider ein Ersetzen, ein im Dashboard angelegtes
+  # Ruleset heißt „default“ und würde sonst direkt nach dem Import zerstört.
+  security_ruleset_names = {
+    for zn, rs in local.security_ruleset_candidates :
+    zn => try(coalesce(rs[0].name, "security-headers"), "security-headers")
   }
 
   # Befunde für die Precondition im Root. HSTS-Preload verlangt laut

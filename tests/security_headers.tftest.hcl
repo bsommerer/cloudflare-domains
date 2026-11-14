@@ -410,6 +410,52 @@ run "foreign_kind_or_unrelated_zone_not_adopted" {
   }
 }
 
+run "adopted_header_ruleset_keeps_its_name" {
+  module { source = "./modules/site-plan" }
+
+  variables {
+    # Gleicher Fall wie beim Redirect-Ruleset: Cloudflare nennt ein im
+    # Dashboard angelegtes Ruleset „default“. `name` erzwingt beim Provider ein
+    # Ersetzen – mit festem Namen würde das importierte Ruleset sofort
+    # zerstört und neu angelegt, samt Lücke ohne Header.
+    existing_rulesets = {
+      "kunde.de" = [
+        { id = "rs-redirect", kind = "zone", phase = "http_request_dynamic_redirect", name = "redirects" },
+        { id = "rs-headers", kind = "zone", phase = "http_response_headers_transform", name = "default" },
+      ]
+    }
+
+    sites = {
+      kunde = { workerName = "kunde", canonicalDomain = "kunde.de", securityHeaders = true }
+    }
+  }
+
+  assert {
+    condition     = output.security_ruleset_adoptions == { "kunde.de" = "rs-headers" }
+    error_message = "Das bestehende Header-Ruleset muss übernommen werden."
+  }
+
+  assert {
+    condition     = output.security_ruleset_names == { "kunde.de" = "default" }
+    error_message = "Ein übernommenes Header-Ruleset muss seinen Namen behalten, sonst wird es ersetzt."
+  }
+}
+
+run "new_header_ruleset_gets_engine_name" {
+  module { source = "./modules/site-plan" }
+
+  variables {
+    sites = {
+      kunde = { workerName = "kunde", canonicalDomain = "kunde.de", securityHeaders = true }
+    }
+  }
+
+  assert {
+    condition     = output.security_ruleset_names == { "kunde.de" = "security-headers" }
+    error_message = "Ohne bestehendes Ruleset bekommt das neue den Engine-Namen."
+  }
+}
+
 # Root: Ressource für eine Zone, die nur Header hat. Der Planer ist
 # oben schon geprüft; hier wird sein Ergebnis überschrieben, damit der Test ohne
 # nachgebaute Provider-Datenstrukturen auskommt.
@@ -434,10 +480,12 @@ run "root_plans_header_ruleset_and_adopts_existing" {
       workers_dev_disabled    = []
       custom_domain_adoptions = {}
       ruleset_adoptions       = {}
+      redirect_ruleset_names  = {}
       ruleset_lookup_zones    = ["kunde.de"]
       security_headers        = { kunde = { "X-Content-Type-Options" = "nosniff" } }
       # Die Übernahme ist oben geprüft; Mock-Provider erlauben keinen import.
       security_ruleset_adoptions = {}
+      security_ruleset_names     = { "kunde.de" = "default" }
       security_findings          = { invalid_hsts = [] }
       security_rules_by_zone = {
         "kunde.de" = [{
@@ -470,5 +518,11 @@ run "root_plans_header_ruleset_and_adopts_existing" {
   assert {
     condition     = cloudflare_ruleset.security_headers["kunde.de"].rules[0].action == "rewrite" && cloudflare_ruleset.security_headers["kunde.de"].rules[0].action_parameters.headers["X-Content-Type-Options"].operation == "set"
     error_message = "Aktion rewrite mit operation set."
+  }
+
+  # Der Name kommt aus dem Planer, damit ein übernommenes Ruleset nicht ersetzt wird.
+  assert {
+    condition     = cloudflare_ruleset.security_headers["kunde.de"].name == "default"
+    error_message = "Das Header-Ruleset muss den vom Planer gelieferten Namen tragen."
   }
 }

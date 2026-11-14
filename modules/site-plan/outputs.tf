@@ -93,6 +93,14 @@ output "security_ruleset_adoptions" {
   value       = local.security_ruleset_adoptions
 }
 
+output "security_ruleset_names" {
+  description = <<-EOT
+    Zonenname -> Name des Header-Rulesets. Bei einer Übernahme der bestehende
+    Name, sonst `security-headers`.
+  EOT
+  value       = local.security_ruleset_names
+}
+
 output "ruleset_lookup_zones" {
   description = "Zonen, für die der Root vorhandene Rulesets nachschlagen soll (Redirects und Header)."
   value       = local.ruleset_lookup_zones

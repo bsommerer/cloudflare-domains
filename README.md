@@ -133,7 +133,8 @@ verlangt `maxAge >= 31536000` und `includeSubDomains`, sonst bricht der Plan ab.
   einer Zone also ggf. `overrideExisting` nutzen.
 - **Bestand:** liegt in der Zone schon ein Ruleset der Phase
   `http_response_headers_transform`, wird es wie beim Redirect-Ruleset per
-  `import` übernommen; fremde Regeln darin erscheinen im Plan als Löschung.
+  `import` übernommen und behält seinen Namen (sonst ersetzt der Provider
+  es); fremde Regeln darin erscheinen im Plan als Löschung.
 - **Token:** zusätzlich *Zone · Transform Rules · Edit*.
 
 ## Testbar ohne Cloudflare

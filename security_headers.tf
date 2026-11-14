@@ -13,8 +13,9 @@
 resource "cloudflare_ruleset" "security_headers" {
   for_each = module.plan.security_rules_by_zone
 
+  # Übernommene Rulesets behalten ihren Namen, sonst ersetzt der Provider sie.
   zone_id     = local.zone_ids_by_name[each.key]
-  name        = "security-headers"
+  name        = module.plan.security_ruleset_names[each.key]
   description = "Basis-Security-Header (Terraform)"
   kind        = "zone"
   phase       = "http_response_headers_transform"
