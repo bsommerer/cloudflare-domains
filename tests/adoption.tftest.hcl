@@ -203,3 +203,56 @@ run "ruleset_without_engine_rules_is_left_alone" {
     error_message = "Ohne Engine-Regeln in der Zone wird kein Ruleset angefasst."
   }
 }
+
+run "adopted_ruleset_keeps_its_name" {
+  module { source = "./modules/site-plan" }
+
+  variables {
+    # So sah es in bastian-sommerer.de aus: ein leeres Redirect-Ruleset, das
+    # Cloudflare beim Anlegen im Dashboard „default“ genannt hat. `name`
+    # erzwingt beim Provider ein Ersetzen – mit festem Namen würde das
+    # importierte Ruleset sofort zerstört und neu angelegt.
+    existing_rulesets = {
+      "kunde.de" = [
+        { id = "rs-leer", kind = "zone", phase = "http_request_dynamic_redirect", name = "default" },
+      ]
+    }
+
+    sites = {
+      kunde = {
+        workerName      = "kunde"
+        canonicalDomain = "kunde.de"
+        redirectWWW     = true
+      }
+    }
+  }
+
+  assert {
+    condition     = output.ruleset_adoptions == { "kunde.de" = "rs-leer" }
+    error_message = "Das leere Ruleset muss übernommen werden."
+  }
+
+  assert {
+    condition     = output.redirect_ruleset_names == { "kunde.de" = "default" }
+    error_message = "Ein übernommenes Ruleset muss seinen Namen behalten, sonst wird es ersetzt."
+  }
+}
+
+run "new_ruleset_gets_engine_name" {
+  module { source = "./modules/site-plan" }
+
+  variables {
+    sites = {
+      kunde = {
+        workerName      = "kunde"
+        canonicalDomain = "kunde.de"
+        redirectWWW     = true
+      }
+    }
+  }
+
+  assert {
+    condition     = output.redirect_ruleset_names == { "kunde.de" = "canonical-redirects" }
+    error_message = "Ohne bestehendes Ruleset bekommt das neue den Engine-Namen."
+  }
+}

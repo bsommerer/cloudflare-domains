@@ -38,4 +38,5 @@ locals {
 
   custom_domain_adoptions = module.plan.custom_domain_adoptions
   ruleset_adoptions       = module.plan.ruleset_adoptions
+  redirect_ruleset_names  = module.plan.redirect_ruleset_names
 }

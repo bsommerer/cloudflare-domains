@@ -61,6 +61,14 @@ output "ruleset_adoptions" {
   value       = local.ruleset_adoptions
 }
 
+output "redirect_ruleset_names" {
+  description = <<-EOT
+    Zonenname -> Name des Redirect-Rulesets. Bei einer Übernahme der
+    bestehende Name, sonst `canonical-redirects`.
+  EOT
+  value       = local.redirect_ruleset_names
+}
+
 output "findings" {
   description = "Konfigurationsprobleme, die der Root als Precondition hart abbricht."
   value       = local.findings
