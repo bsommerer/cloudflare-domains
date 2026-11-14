@@ -152,7 +152,7 @@ Mocks:
 
 ```bash
 terraform test                         # 76 Fälle, keine Credentials
-node --test scripts/*/test/*.test.mjs  # 37 Fälle der Node-Skripte
+node --test scripts/*/test/*.test.mjs  # 62 Fälle der Node-Skripte
 ```
 
 Der Root verdrahtet danach nur noch Plan → Ressourcen. Der Umweg ist der ganze
@@ -469,6 +469,82 @@ Wahlweise als eigenes Secret `CLOUDFLARE_BUILDS_API_TOKEN`, sonst gilt
 `CLOUDFLARE_API_TOKEN`. Ohne `builds`-Block ist der Abgleich ein No-Op ohne
 API-Aufruf; bestehende Config-Repos merken nichts davon.
 
+## Integrationstests
+
+`terraform test` beweist, dass der Plan stimmt – nicht, dass Cloudflare ihn so
+ausliefert. [`scripts/integration`](scripts/integration) (Node ≥ 20, keine
+Abhängigkeiten) leitet deshalb aus denselben Site-Dateien samt
+`_defaults.json` ab, was live zu sehen sein muss, und prüft es mit
+GET-Requests – auch gegen Produktivseiten unbedenklich:
+
+| Feld | Prüfung |
+| --- | --- |
+| `canonicalDomain` | HTTPS antwortet mit 2xx und `server: cloudflare`, keine Weiterleitung auf eine fremde Domain |
+| `alwaysUseHttps` | `http://` leitet auf `https://` um, Pfad und Query bleiben erhalten |
+| `redirectDomains`, `redirectWWW` | jede Domain (www nur für Apex-Domains) antwortet mit `redirectStatusCode` auf `https://<canonical><pfad>?<query>` – geprüft mit Testpfad und Query |
+| `securityHeaders` | erwartete Header auf der kanonischen Domain; ohne `overrideExisting` hat ein Header der Seite Vorrang; HSTS auch auf den Redirect-Domains |
+| `disableWorkersDev` | `https://<worker>.<subdomain>.workers.dev` liefert die Seite nicht aus |
+| `protectPreviews` | Preview-URLs der jüngsten Version (und ihr Alias) leiten ohne Login auf Cloudflare Access um bzw. antworten 401/403; ohne Preview: übersprungen |
+| `builds` | Trigger `cfd:production`/`cfd:preview` und ihre Variablen entsprechen der Konfiguration |
+
+Was sich nicht ableiten lässt, steht optional im Block `integration` der
+Site-Datei – etwa ein Header, den das Repo selbst setzt und den die Engine
+nicht überschreiben darf, oder eine Site, die nicht geprüft werden soll:
+
+```json
+"integration": { "expectHeaders": { "Referrer-Policy": "no-referrer" } }
+"integration": { "enabled": false }
+```
+
+Frisch angelegte Domains brauchen für Zertifikat und DNS einige Minuten.
+Fehlgeschlagene Prüfungen werden deshalb mit wachsendem Abstand wiederholt,
+bis zum Zeitbudget `--max-wait` (Default 600 s für alle Prüfungen zusammen).
+Ergebnis: GitHub-Annotations, eine Tabelle in der Job-Summary und Exit ≠ 0
+bei Fehlern.
+
+```bash
+node scripts/integration/integration.mjs --sites-dir ../sites-config/sites \
+  [--site cfd-testsite] [--max-wait 0]
+```
+
+Ohne `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID` werden Previews und
+Builds übersprungen, und die www-Varianten werden ohne Zonenliste genähert.
+Rechte: *Zone Read*, *Workers Scripts Read*, *Workers Builds Configuration
+Read*.
+
+Im Config-Repo als Reusable Workflow – nach jedem Apply, täglich und von Hand:
+
+```yaml
+# deploy-domains.yml, nach dem Apply-Job
+  integration:
+    needs: domains
+    uses: bsommerer/cloudflare-domains/.github/workflows/integration.yml@v1
+    with:
+      engine_ref: v1
+    secrets:
+      CLOUDFLARE_API_TOKEN:  ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+```
+
+Inputs: `site` (nur diese Slugs, kommagetrennt), `max_wait`, `sites_dir`,
+`engine_ref`.
+
+### Ablauf für neue Engine-Versionen
+
+Eine Testseite mit allen Features (`sites/cfd-testsite.json` im Config-Repo,
+Worker aus `bsommerer/cfd-testsite`, Zone `sommerer.online`) dient als
+Abnahme, bevor ein Tag entsteht:
+
+1. Engine-PR → CI grün → mergen (Merge-Commit).
+2. Im Config-Repo Workflows **und** `engine_ref` auf den Merge-Commit (SHA)
+   von `main` stellen. Der PR-Plan darf nur die erwarteten Änderungen zeigen.
+3. Mergen → Apply → Builds-Abgleich → Integrationstests müssen grün sein.
+   Schlägt etwas fehl: Fix in der Engine, neuer SHA, zurück zu 2.
+4. Annotierten Tag `vX.Y.Z` auf genau diesen Commit setzen und `v1`
+   nachziehen (`git tag -f v1 <sha> && git push -f origin v1`).
+5. Config-Repo auf `@vX.Y.Z` + `engine_ref: vX.Y.Z` umstellen – der Plan muss
+   „No changes“ zeigen.
+
 ## Warum überhaupt Terraform
 
 **Warum kein Redirect im Worker?** Würde funktionieren, macht aber jeden
@@ -489,7 +565,7 @@ ist der `plan` — und er ist der Review-Gegenstand im PR.
 
 ## Status
 
-76 `terraform test`-Fälle, 37 `node --test`-Fälle der Skripte, `terraform validate` und CI grün.
+76 `terraform test`-Fälle, 62 `node --test`-Fälle der Skripte, `terraform validate` und CI grün.
 
 In Produktion gelaufen: erster Apply gegen ein echtes Cloudflare-Konto
 inklusive Übernahme einer bestehenden Custom Domain, R2-Backend mit

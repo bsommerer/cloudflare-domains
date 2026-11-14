@@ -1,0 +1,79 @@
+name: Integration tests (reusable)
+
+# Reusable Workflow für das zentrale Config-Repo: prüft live, ob die Sites so
+# ausgeliefert werden, wie ihre Site-Dateien es beschreiben – siehe README,
+# Abschnitt "Integrationstests". Ändert nichts, nur GET-Requests.
+#
+# Aufruf aus dem Config-Repo, z. B. nach dem Apply und zeitgesteuert:
+#   jobs:
+#     integration:
+#       uses: bsommerer/cloudflare-domains/.github/workflows/integration.yml@v1
+#       with:
+#         engine_ref: v1
+#       secrets:
+#         CLOUDFLARE_API_TOKEN:  ${{ secrets.CLOUDFLARE_API_TOKEN }}
+#         CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+on:
+  workflow_call:
+    inputs:
+      engine_ref:
+        description: Git-Ref (Tag/Branch/SHA) der Engine, deren Prüfungen laufen
+        type: string
+        default: main
+      sites_dir:
+        description: Verzeichnis mit den Site-Dateien im Config-Repo
+        type: string
+        default: sites
+      site:
+        description: Nur diese Site(s) prüfen (Slug, mehrere mit Komma); leer = alle
+        type: string
+        default: ""
+      max_wait:
+        description: >-
+          Zeitbudget in Sekunden für Wiederholungen fehlgeschlagener Prüfungen
+          (frische Domains brauchen für Zertifikat und DNS einige Minuten)
+        type: number
+        default: 600
+    secrets:
+      # Optional: ohne Token werden Previews und Builds übersprungen.
+      # Rechte: Zone Read, Workers Scripts Read, Workers Builds Configuration Read.
+      CLOUDFLARE_API_TOKEN:
+        required: false
+      CLOUDFLARE_ACCOUNT_ID:
+        required: false
+      CLOUDFLARE_BUILDS_API_TOKEN:
+        required: false
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Config-Repo auschecken (Caller)
+        uses: actions/checkout@v4
+        with:
+          path: config
+
+      - name: Engine auschecken
+        uses: actions/checkout@v4
+        with:
+          repository: bsommerer/cloudflare-domains
+          ref: ${{ inputs.engine_ref }}
+          path: engine
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Integrationstests
+        env:
+          # Für die Builds-Trigger gilt dasselbe Token wie beim Abgleich.
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_BUILDS_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          SITE: ${{ inputs.site }}
+        run: |
+          ARGS=()
+          [ -n "$SITE" ] && ARGS+=(--site "$SITE")
+          node engine/scripts/integration/integration.mjs \
+            --sites-dir "config/${{ inputs.sites_dir }}" \
+            --max-wait "${{ inputs.max_wait }}" "${ARGS[@]}"
