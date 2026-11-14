@@ -3,7 +3,8 @@
     "redirectWWW": true,
     "redirectStatusCode": 301,
     "preserveQueryString": true,
-    "alwaysUseHttps": true
+    "alwaysUseHttps": true,
+    "securityHeaders": true
   },
   "builds": {
     "productionBranch": "main",

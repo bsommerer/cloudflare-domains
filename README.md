@@ -86,6 +86,56 @@ gleich mit. Die Engine benutzt `target_url.expression` mit
 `concat("https://…", http.request.uri.path)`; den Query-String hält
 `preserve_query_string`.
 
+## Security-Header
+
+Statt dieselben Header in jedes Website-Repo (`_headers`) zu kopieren, setzt die
+Engine sie je Zone per Response-Header-Transform-Rule. Pro Site, im
+`domains`-Block (oder in `_defaults.json`):
+
+```json
+"securityHeaders": true
+```
+
+`true` setzt konservative Defaults, `false`/fehlend nichts. Zum Feinsteuern ein
+Objekt – alles Weggelassene fällt auf die Defaults zurück:
+
+```json
+"securityHeaders": {
+  "enabled": true,
+  "hsts": { "maxAge": 31536000, "includeSubDomains": false, "preload": false },
+  "referrerPolicy": "strict-origin-when-cross-origin",
+  "permissionsPolicy": "geolocation=(), camera=(), microphone=(), interest-cohort=()",
+  "contentTypeOptions": true,
+  "frameOptions": "SAMEORIGIN",
+  "overrideExisting": false
+}
+```
+
+`false` bei `hsts`, `referrerPolicy`, `permissionsPolicy` oder `frameOptions`
+lässt den jeweiligen Header weg. Ein Objekt in der Site ersetzt ein Objekt aus
+`_defaults.json` komplett (das Mischen dort ist flach). HSTS mit `preload`
+verlangt `maxAge >= 31536000` und `includeSubDomains`, sonst bricht der Plan ab.
+
+- **Hosts:** die kanonische Domain bekommt alle Header. Redirect-Domains
+  antworten mit einer leeren 301, dort sind nur Strict-Transport-Security
+  sinnvoll – der Browser merkt sich, dass die Domain nur noch per HTTPS
+  angesprochen wird, und die Preload-Liste verlangt den Header auch auf der
+  Weiterleitung.
+- **Vorrang der Seite:** eine Transform Rule mit `set` *ersetzt* einen Header,
+  den der Worker bzw. die `_headers` der Seite schon liefert. Im Standard setzt
+  die Engine deshalb nur, was fehlt: eine Regel je Header mit der Bedingung
+  `not any(http.response.headers.names[*] == "…")`. Was ein Repo selbst in
+  `_headers` setzt, gewinnt. Mit `overrideExisting: true` überschreibt die
+  Engine stattdessen, und alle Header einer Site stehen in einer Regel.
+- **Kontingent:** der Standard braucht bis zu fünf Regeln je Site und Zone,
+  `overrideExisting` eine. Das Kontingent für Response-Header-Transform-Rules
+  hängt vom Cloudflare-Plan ab (Free: 10 pro Zone) – bei mehreren Sites in
+  einer Zone also ggf. `overrideExisting` nutzen.
+- **Bestand:** liegt in der Zone schon ein Ruleset der Phase
+  `http_response_headers_transform`, wird es wie beim Redirect-Ruleset per
+  `import` übernommen; fremde Regeln darin erscheinen im Plan als Löschung.
+- **Token:** zusätzlich *Zone · Transform Rules · Edit*.
+
 ## Testbar ohne Cloudflare
 
 ```
@@ -178,6 +228,7 @@ passiert.
 | Zone    | DNS                | Edit  | Platzhalter-Records der Redirect-Domains |
 | Zone    | Single Redirect    | Edit  | die 301-Regeln                           |
 | Zone    | Zone Settings      | Edit  | `always_use_https`                       |
+| Zone    | Transform Rules    | Edit  | Security-Header (nur mit `securityHeaders`) |
 
 > ⚠️ **Single Redirect**, nicht *Config Rules*. Redirect Rules leben in der
 > Phase `http_request_dynamic_redirect`, für die Cloudflare genau diese

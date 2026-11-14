@@ -73,3 +73,32 @@ output "findings" {
   description = "Konfigurationsprobleme, die der Root als Precondition hart abbricht."
   value       = local.findings
 }
+
+output "security_headers" {
+  description = "Slug -> Header, die für die Site gesetzt werden (nur Sites mit aktivem `securityHeaders`)."
+  value       = local.sec_headers
+}
+
+output "security_rules_by_zone" {
+  description = <<-EOT
+    Zone -> Regeln für das Header-Transform-Ruleset. Je Regel: Hosts, Header,
+    Expression und – im Standard – der Header, den die Antwort noch nicht haben
+    darf (`guard`, leer im Überschreib-Modus).
+  EOT
+  value       = local.security_rules_by_zone
+}
+
+output "security_ruleset_adoptions" {
+  description = "Zonenname -> ID des bereits bestehenden Rulesets der Phase `http_response_headers_transform`."
+  value       = local.security_ruleset_adoptions
+}
+
+output "ruleset_lookup_zones" {
+  description = "Zonen, für die der Root vorhandene Rulesets nachschlagen soll (Redirects und Header)."
+  value       = local.ruleset_lookup_zones
+}
+
+output "security_findings" {
+  description = "Konfigurationsprobleme bei `securityHeaders`; der Root bricht den Plan ab."
+  value       = local.security_findings
+}

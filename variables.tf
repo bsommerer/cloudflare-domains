@@ -56,6 +56,10 @@ variable "sites" {
     redirectStatusCode  = optional(number, 301)
     preserveQueryString = optional(bool, true)
     alwaysUseHttps      = optional(bool, true)
+
+    # bool oder Objekt (enabled, hsts, referrerPolicy, permissionsPolicy,
+    # contentTypeOptions, frameOptions, overrideExisting) – daher `any`.
+    securityHeaders = optional(any, false)
   }))
 
   default = {}

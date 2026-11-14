@@ -173,6 +173,62 @@
           "type": "boolean",
           "default": true,
           "description": "Setzt das Zone-Setting always_use_https auf 'on' fuer alle Zonen dieser Site."
+        },
+
+        "securityHeaders": {
+          "description": "Basis-Security-Header als Response Header Transform Rule. true = konservative Defaults, false oder fehlend = aus, Objekt = feinsteuern. Ein Objekt in einer Site ersetzt ein Objekt aus _defaults.json komplett.",
+          "default": false,
+          "oneOf": [
+            { "type": "boolean" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": { "type": "boolean", "default": true },
+                "hsts": {
+                  "description": "Strict-Transport-Security. false schaltet den Header ab. Gilt auch fuer Redirect-Domains. preload verlangt maxAge >= 31536000 und includeSubDomains.",
+                  "oneOf": [
+                    { "const": false },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "enabled": { "type": "boolean", "default": true },
+                        "maxAge": { "type": "integer", "minimum": 0, "default": 31536000 },
+                        "includeSubDomains": { "type": "boolean", "default": false },
+                        "preload": { "type": "boolean", "default": false }
+                      }
+                    }
+                  ]
+                },
+                "referrerPolicy": {
+                  "description": "Referrer-Policy; false schaltet ab.",
+                  "oneOf": [{ "type": "string", "minLength": 1 }, { "const": false }],
+                  "default": "strict-origin-when-cross-origin"
+                },
+                "permissionsPolicy": {
+                  "description": "Permissions-Policy; false schaltet ab.",
+                  "oneOf": [{ "type": "string", "minLength": 1 }, { "const": false }],
+                  "default": "geolocation=(), camera=(), microphone=(), interest-cohort=()"
+                },
+                "contentTypeOptions": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "X-Content-Type-Options: nosniff."
+                },
+                "frameOptions": {
+                  "description": "X-Frame-Options; false schaltet ab.",
+                  "oneOf": [{ "enum": ["DENY", "SAMEORIGIN"] }, { "const": false }],
+                  "default": "SAMEORIGIN"
+                },
+                "overrideExisting": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "false: ein Header wird nur gesetzt, wenn die Antwort ihn nicht schon hat (z. B. aus _headers der Seite) - dafuer eine Regel je Header. true: die Engine ueberschreibt, alle Header einer Site stehen in einer Regel."
+                }
+              }
+            }
+          ]
         }
       }
     }
