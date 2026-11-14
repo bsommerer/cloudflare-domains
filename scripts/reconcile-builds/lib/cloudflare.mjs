@@ -30,6 +30,14 @@ export function createClient({ token, accountId, githubToken = '', fetch = globa
       if (res.status === 403 || res.status === 401) {
         hint = ' – fehlt dem Token "Workers Builds Configuration: Edit" bzw. "Workers Scripts: Read"?'
       }
+      // Cloudflares Meldung dazu („linked to a repository that no longer
+      // exists“) führt in die Irre: gemeint ist fast immer, dass die
+      // Cloudflare-GitHub-App das Repo nicht sehen darf.
+      if ((json.errors || []).some(e => e.code === 8000012)) {
+        hint =
+          ' – die GitHub-App "Cloudflare Workers and Pages" hat vermutlich keinen Zugriff auf das Repo' +
+          ' (GitHub → Settings → Applications → Configure → Repository access).'
+      }
       throw new ApiError(`Cloudflare ${method} ${path} -> ${res.status} ${errs}${hint}`.trim(), res.status)
     }
     return json.result

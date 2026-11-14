@@ -152,7 +152,7 @@ Mocks:
 
 ```bash
 terraform test                         # 77 Fälle, keine Credentials
-node --test scripts/*/test/*.test.mjs  # 63 Fälle der Node-Skripte
+node --test scripts/*/test/*.test.mjs  # 64 Fälle der Node-Skripte
 ```
 
 Der Root verdrahtet danach nur noch Plan → Ressourcen. Der Umweg ist der ganze
@@ -568,7 +568,7 @@ ist der `plan` — und er ist der Review-Gegenstand im PR.
 
 ## Status
 
-77 `terraform test`-Fälle, 63 `node --test`-Fälle der Skripte, `terraform validate` und CI grün.
+77 `terraform test`-Fälle, 64 `node --test`-Fälle der Skripte, `terraform validate` und CI grün.
 
 In Produktion gelaufen: erster Apply gegen ein echtes Cloudflare-Konto
 inklusive Übernahme einer bestehenden Custom Domain, R2-Backend mit
