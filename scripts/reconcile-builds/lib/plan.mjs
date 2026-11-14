@@ -57,7 +57,7 @@ function adoptable(t, site, role) {
   return sameList(t.branch_includes, ['*']) && (t.branch_excludes ?? []).includes(site.productionBranch)
 }
 
-function triggerChanges(current, desired) {
+export function triggerChanges(current, desired) {
   const changes = []
   for (const f of TRIGGER_FIELDS) {
     const a = current[f]

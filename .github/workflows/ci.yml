@@ -45,6 +45,11 @@ jobs:
       - name: Tests reconcile-builds
         run: node --test scripts/reconcile-builds/test/*.test.mjs
 
+      # Integrationstests: Ableitung der Erwartungen und Auswertung gegen ein
+      # nachgebautes Netz. Die Live-Läufe macht das Config-Repo.
+      - name: Tests der Integrationstests
+        run: node --test scripts/integration/test/*.test.mjs
+
       - name: Validate examples
         run: |
           for dir in examples/*/; do

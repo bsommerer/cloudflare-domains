@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/bsommerer/cloudflare-domains/main/schema/domains.schema.json",
   "title": "cloudflare-domains capability block",
-  "description": "Der `domains`-Block einer Site-Datei im zentralen Config-Repo. Verknuepft Domains mit einem Cloudflare-Worker. Diese Engine liest ausschliesslich diesen Block sowie `repo`, `repoRef`, `wranglerConfig` (Pruefung scripts/check-wrangler) und `builds` (Abgleich der Workers Builds, scripts/reconcile-builds); andere Top-Level-Keys gehoeren anderen Engines und werden ignoriert.",
+  "description": "Der `domains`-Block einer Site-Datei im zentralen Config-Repo. Verknuepft Domains mit einem Cloudflare-Worker. Diese Engine liest ausschliesslich diesen Block sowie `repo`, `repoRef`, `wranglerConfig` (Pruefung scripts/check-wrangler) `builds` (Abgleich der Workers Builds, scripts/reconcile-builds) und `integration` (Integrationstests, scripts/integration); andere Top-Level-Keys gehoeren anderen Engines und werden ignoriert.",
 
   "type": "object",
   "properties": {
@@ -27,7 +27,25 @@
       "description": "Pfad der wrangler-Datei in `repo` (wrangler.toml, wrangler.jsonc oder wrangler.json)."
     },
 
-    "builds": { "$ref": "#/$defs/builds" }
+    "builds": { "$ref": "#/$defs/builds" },
+
+    "integration": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional: Einstellungen der Integrationstests (scripts/integration). Die Erwartungen leiten sich aus `domains` und `builds` ab; hier steht nur, was sich daraus nicht ableiten laesst.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "false nimmt die Site aus den Integrationstests heraus."
+        },
+        "expectHeaders": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Antwort-Header der kanonischen Domain mit exakt erwartetem Wert, typischerweise vom Repo selbst gesetzte (`_headers`), die die Engine nicht ueberschreiben darf."
+        }
+      }
+    }
   },
   "dependentRequired": { "builds": ["repo"] },
 
