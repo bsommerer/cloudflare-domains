@@ -105,12 +105,21 @@ import {
 # Optional: den *.workers.dev-Hostnamen abschalten, damit die Seite nicht
 # zusätzlich unter einer Cloudflare-Domain indexiert wird. Nur verwaltet, wenn
 # `disableWorkersDev` in der Site-Datei gesetzt ist.
+#
+# Achtung: Dieselbe Einstellung schaltet auch die Preview-URLs. Ohne
+# `previews_enabled` setzt die API sie beim Abschalten von workers.dev
+# stillschweigend mit ab – protectPreviews hätte dann nichts mehr zu schützen,
+# und `preview_urls = true` in der wrangler.toml wäre bis zum nächsten Deploy
+# wirkungslos. Deshalb bleiben Previews eines Workers mit protectPreviews
+# ausdrücklich an (sie liegen ja hinter Access). Ohne Schutz bleibt es beim
+# bisherigen Verhalten: die Engine sagt nichts, die API schaltet sie ab.
 resource "cloudflare_workers_script_subdomain" "canonical" {
   for_each = toset(local.workers_dev_disabled)
 
-  account_id  = var.account_id
-  script_name = each.value
-  enabled     = false
+  account_id       = var.account_id
+  script_name      = each.value
+  enabled          = false
+  previews_enabled = contains(keys(local.preview_protection), each.value) ? true : null
 }
 
 #############################################

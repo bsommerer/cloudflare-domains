@@ -158,7 +158,12 @@ export function deriveChecks(raw, defaults = {}, { zones = null, only = null } =
       // protectPreviews wird wie in modules/site-plan/access.tf feldweise mit
       // den Defaults gemischt.
       const pp = { ...(defaults.domains?.protectPreviews ?? {}), ...(site.domains.protectPreviews ?? {}) }
-      if (pp.enabled === true) checks.push({ type: 'previews', worker: d.workerName })
+      // Mit disableWorkersDev schaltet die Engine die Previews ausdrücklich an
+      // (main.tf); abgeschaltete Previews sind dann ein Fehler, sonst eine
+      // Entscheidung der wrangler.toml (`preview_urls`).
+      if (pp.enabled === true) {
+        checks.push({ type: 'previews', worker: d.workerName, engineKeepsOn: d.disableWorkersDev === true })
+      }
     }
 
     if (b) {

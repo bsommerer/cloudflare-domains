@@ -133,6 +133,19 @@ test('Preview ohne Schutz ist ein Fehler, ohne Preview übersprungen', async () 
   assert.match(annotations(report).join('\n'), /::notice title=.*übersprungen/)
 })
 
+test('Previews abgeschaltet: Fehler, wenn die Engine sie anlassen müsste, sonst übersprungen', async () => {
+  const routes = healthyRoutes()
+  routes[api('/workers/scripts/cfd-testsite/subdomain')] = [{ enabled: false, previews_enabled: false }]
+  let { sites } = deriveChecks({ t: site }, {}, { zones: ['sommerer.online'] })
+  let report = await runChecks(sites, opts(fakeNet(routes), { maxWaitMs: 0 }))
+  assert.equal(report[0].results.find(r => r.check.type === 'previews').state, 'fail')
+
+  const ohne = { ...site, domains: { ...site.domains, disableWorkersDev: false } }
+  ;({ sites } = deriveChecks({ t: ohne }, {}, { zones: ['sommerer.online'] }))
+  report = await runChecks(sites, opts(fakeNet(routes)))
+  assert.equal(report[0].results.find(r => r.check.type === 'previews').state, 'skip')
+})
+
 test('ohne Cloudflare-API: Previews übersprungen statt Fehler', async () => {
   const net = fakeNet(healthyRoutes())
   const { sites } = deriveChecks({ t: site }, {}, { zones: ['sommerer.online'] })
