@@ -229,6 +229,42 @@
               }
             }
           ]
+        },
+
+        "protectPreviews": { "$ref": "#/$defs/protectPreviews" }
+      }
+    },
+
+    "protectPreviews": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Stellt die Preview-URLs des Workers (<version>-<worker>.<subdomain>.workers.dev, <alias>-<worker>.<subdomain>.workers.dev) hinter Cloudflare Access: Access-Application mit Destination 'preview_worker' plus wiederverwendbare Policy. Produktion bleibt oeffentlich. Ob Previews ueberhaupt ausgeliefert werden, steuert preview_urls in der wrangler.toml.",
+      "$comment": "Wird feldweise mit _defaults.json gemischt: die Allowlist kann zentral stehen, die Site setzt nur enabled. Mindestens ein Eintrag in allowedEmails oder allowedEmailDomains ist Pflicht, sobald enabled true ist - das prueft die Engine im Plan, weil die Allowlist aus den Defaults kommen darf.",
+
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "false oder fehlend: Previews bleiben ungeschuetzt."
+        },
+
+        "allowedEmails": {
+          "type": "array",
+          "uniqueItems": true,
+          "default": [],
+          "items": {
+            "type": "string",
+            "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+          },
+          "description": "E-Mail-Adressen, die sich anmelden duerfen (ohne eigenen IdP per One-time PIN)."
+        },
+
+        "allowedEmailDomains": {
+          "type": "array",
+          "uniqueItems": true,
+          "default": [],
+          "items": { "$ref": "#/$defs/hostname" },
+          "description": "Jede verifizierte Adresse unter diesen Domains darf sich anmelden, z. B. \"example.com\" (ohne @)."
         }
       }
     }

@@ -52,6 +52,7 @@ Sechs Hostnamen, drei Cloudflare-Zonen, ein `terraform apply`. Die drei
 | `cloudflare_ruleset` | **ein** Redirect-Ruleset pro Zone — Pfad und Query bleiben |
 | `cloudflare_zone_setting` | `always_use_https`, pro Zone dedupliziert |
 | `cloudflare_workers_script_subdomain` | optional: `*.workers.dev` abschalten |
+| `cloudflare_zero_trust_access_application` + `_policy` | optional: Preview-URLs nur nach Login (`protectPreviews`) |
 
 ## Warum das nicht trivial ist
 
@@ -221,15 +222,17 @@ passiert.
 <details>
 <summary><b>API-Token — welche Rechte, und eine Falle</b></summary>
 
-| Scope   | Permission         | Level | Wofür                                    |
-| ------- | ------------------ | ----- | ---------------------------------------- |
-| Account | Workers Scripts    | Edit  | Custom Domain + workers.dev-Hostname     |
-| Account | Workers R2 Storage | Edit  | Terraform-State im R2-Bucket             |
-| Zone    | Zone               | Read  | Zonen-Zuordnung                          |
-| Zone    | DNS                | Edit  | Platzhalter-Records der Redirect-Domains |
-| Zone    | Single Redirect    | Edit  | die 301-Regeln                           |
-| Zone    | Zone Settings      | Edit  | `always_use_https`                       |
-| Zone    | Transform Rules    | Edit  | Security-Header (nur mit `securityHeaders`) |
+| Scope   | Permission                   | Level | Wofür                                                  |
+| ------- | ---------------------------- | ----- | ------------------------------------------------------ |
+| Account | Workers Scripts              | Edit  | Custom Domain + workers.dev-Hostname                   |
+| Account | Workers R2 Storage           | Edit  | Terraform-State im R2-Bucket                           |
+| Account | Workers Builds Configuration | Edit  | nur mit `builds`: Trigger, Variablen, Repo-Verbindung  |
+| Account | Access: Apps and Policies    | Edit  | nur mit `protectPreviews`: Access-Application + Policy |
+| Zone    | Zone                         | Read  | Zonen-Zuordnung                                        |
+| Zone    | DNS                          | Edit  | Platzhalter-Records der Redirect-Domains               |
+| Zone    | Single Redirect              | Edit  | die 301-Regeln                                         |
+| Zone    | Zone Settings                | Edit  | `always_use_https`                                     |
+| Zone    | Transform Rules              | Edit  | nur mit `securityHeaders`: Security-Header             |
 
 > ⚠️ **Single Redirect**, nicht *Config Rules*. Redirect Rules leben in der
 > Phase `http_request_dynamic_redirect`, für die Cloudflare genau diese
@@ -263,7 +266,8 @@ kanonische Domain selbst die www-Form, entsteht daraus keine Schleife. Am
 besten steht sie einmal in `_defaults.json` für alle Sites.
 
 Weitere Felder: `redirectStatusCode` (301/302/307/308, Default 301),
-`preserveQueryString`, `alwaysUseHttps`, `disableWorkersDev`.
+`preserveQueryString`, `alwaysUseHttps`, `disableWorkersDev`,
+`protectPreviews` (siehe unten).
 
 </details>
 
@@ -290,6 +294,54 @@ import {
   Regel. Die alte Verknüpfung im Dashboard lösen, sonst gewinnt sie.
 - Der Block bleibt dauerhaft stehen: liegt die Ressource im State, ist er ein
   No-Op.
+
+</details>
+
+<details>
+<summary><b>Preview-URLs hinter Login — <code>protectPreviews</code></b></summary>
+
+Preview-URLs eines Workers (`<version>-<worker>.<subdomain>.workers.dev`,
+`<alias>-<worker>.<subdomain>.workers.dev`) sind öffentlich — auch wenn
+`disableWorkersDev` den normalen workers.dev-Hostnamen abschaltet. Für Seiten
+mit persönlichen Daten soll dort nur durchkommen, wer sich anmeldet:
+
+```json
+"domains": {
+  "workerName": "visitenkarte",
+  "protectPreviews": {
+    "enabled": true,
+    "allowedEmails": ["ich@example.de"],
+    "allowedEmailDomains": []
+  },
+  "…": "…"
+}
+```
+
+Die Engine baut nach, was das Dashboard unter *Worker > Access > Previews only*
+anlegt ([Doku](https://developers.cloudflare.com/workers/configuration/cloudflare-access/)):
+eine self-hosted Access-Application mit Destination `preview_worker`, gebunden
+an die **unveränderliche Worker-ID** — nicht an einen Wildcard-Hostnamen auf
+workers.dev. Dazu eine wiederverwendbare Policy mit der Allowlist. Produktion
+(Custom Domain, workers.dev) bleibt öffentlich.
+
+- `protectPreviews` wird **feldweise** mit `_defaults.json` gemischt: die
+  Allowlist kann zentral stehen, die Site setzt nur `"enabled": true` — oder
+  die Defaults schalten für alle ein und eine Site steigt mit
+  `"enabled": false` aus.
+- Eine Application pro **Worker**. Bedient ein Worker mehrere Sites, gilt die
+  Vereinigung ihrer Allowlists.
+- Ohne eigenen Identity Provider meldet man sich per One-time PIN an die
+  E-Mail-Adresse an. Zero Trust muss im Account aktiviert sein.
+- Ob Previews **überhaupt** ausgeliefert werden, steuert `preview_urls` in der
+  `wrangler.toml` — wrangler setzt den Wert bei jedem Deploy. Die Engine fasst
+  ihn bewusst nicht an, sonst stritten sich zwei Quellen. Sie schützt nur, was
+  wrangler ausrollt.
+- Hat jemand den Schutz schon im Dashboard eingeschaltet, existiert dort eine
+  zweite Application für denselben Worker. Vor dem ersten Apply im Dashboard
+  wieder abschalten — die Engine übernimmt sie nicht.
+
+Braucht Provider ≥ 5.24 (`preview_worker`-Destination) und die
+Token-Permission *Access: Apps and Policies · Edit*.
 
 </details>
 

@@ -60,6 +60,13 @@ variable "sites" {
     # bool oder Objekt (enabled, hsts, referrerPolicy, permissionsPolicy,
     # contentTypeOptions, frameOptions, overrideExisting) – daher `any`.
     securityHeaders = optional(any, false)
+
+    # Preview-URLs des Workers nur nach Cloudflare-Access-Login, siehe access.tf.
+    protectPreviews = optional(object({
+      enabled             = optional(bool, false)
+      allowedEmails       = optional(list(string), [])
+      allowedEmailDomains = optional(list(string), [])
+    }))
   }))
 
   default = {}

@@ -61,6 +61,12 @@ module "plan" {
       for r in d.rulesets : { id = r.id, kind = r.kind, phase = r.phase, name = r.name }
     ]
   }
+
+  # protectPreviews, siehe access.tf. Wie oben: der Lookup hängt nur an den
+  # geschützten Workern, nicht an dieser Eingabe.
+  worker_ids = {
+    for w in try(data.cloudflare_workers.preview[0].result, []) : w.name => w.id
+  }
 }
 
 #############################################
