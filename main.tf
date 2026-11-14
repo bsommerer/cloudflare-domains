@@ -25,9 +25,10 @@ data "cloudflare_workers_custom_domains" "all" {
 }
 
 # Grundlage der Ruleset-Übernahme: bestehende Rulesets, aber nur in Zonen, in
-# denen die Engine Weiterleitungen setzt – nicht für jede Zone im Account.
+# denen die Engine Weiterleitungen oder Security-Header setzt – nicht für jede
+# Zone im Account.
 data "cloudflare_rulesets" "zone" {
-  for_each = local.rules_by_zone
+  for_each = toset(module.plan.ruleset_lookup_zones)
 
   zone_id   = local.zone_ids_by_name[each.key]
   max_items = local.ruleset_page_size

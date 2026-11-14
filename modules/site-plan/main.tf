@@ -26,6 +26,7 @@ locals {
       redirectStatusCode  = try(s.redirectStatusCode, 301)
       preserveQueryString = try(s.preserveQueryString, true)
       alwaysUseHttps      = try(s.alwaysUseHttps, true)
+      securityHeaders     = try(s.securityHeaders, false)
     }
   }
 
@@ -39,6 +40,7 @@ locals {
       redirectStatusCode  = try(s.redirectStatusCode, 301)
       preserveQueryString = try(s.preserveQueryString, true)
       alwaysUseHttps      = try(s.alwaysUseHttps, true)
+      securityHeaders     = try(s.securityHeaders, false)
     }
   }
 
