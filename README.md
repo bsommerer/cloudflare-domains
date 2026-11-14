@@ -299,6 +299,71 @@ Bestehende Aufrufer brauchen keine Änderung.
 
 </details>
 
+## Workers Builds: Deploy-Einstellungen ins Config-Repo
+
+Die Worker selbst deployt Cloudflare Workers Builds aus dem Git-Repo der Site.
+Deren Einstellungen – welcher Branch produktiv geht, welche Befehle laufen,
+welche Build-Variablen gesetzt sind, ob Branches eine Vorschau bekommen –
+lebten bisher nur im Dashboard. Ein optionaler `builds`-Block holt sie in
+dieselbe Site-Datei:
+
+```json
+{
+  "repo": "kunde-xy-org/kunde-xy-website",
+  "domains": { "enabled": true, "workerName": "kunde-xy", "canonicalDomain": "kunde-xy.de" },
+  "builds": {
+    "enabled": true,
+    "productionBranch": "main",
+    "buildCommand": "npm run build",
+    "deployCommand": "npx wrangler deploy",
+    "previews": true,
+    "env": { "SKIP_DEPENDENCY_INSTALL": "1" }
+  }
+}
+```
+
+Der Terraform-Provider kennt Workers Builds nicht, deshalb gleicht
+[`scripts/reconcile-builds`](scripts/reconcile-builds) (Node ≥ 20, keine
+Abhängigkeiten) direkt gegen die API ab – im Validate-Workflow als Plan in
+Job-Summary und PR-Kommentar, im Apply-Workflow nach dem `terraform apply`.
+
+- **Zwei Trigger pro Worker:** `cfd:production` (nur `productionBranch`,
+  `deployCommand`) und mit `previews` zusätzlich `cfd:preview` (alle anderen
+  Branches, `previewDeployCommand`, Default `npx wrangler versions upload`).
+- **Eigentum über den Namen:** verändert oder gelöscht werden nur Trigger mit
+  `cfd:`-Präfix. Fremde Trigger bleiben unangetastet, der Plan weist nur auf
+  sie hin.
+- **Bestandsübernahme:** Ein im Dashboard angelegter Trigger mit demselben
+  Repo und demselben Branch-Muster wird umbenannt und angeglichen statt
+  verdoppelt. Passen mehrere, bricht der Plan ab, statt zu raten.
+- **Build-Variablen:** gesetzt wird, was in `env` steht, plus automatisch
+  `SITE_URL=https://<canonicalDomain>` (überschreibbar). Entfernt wird nur,
+  was der Abgleich selbst gesetzt hatte – das hält er in der Variable
+  `CFD_MANAGED_ENV` fest. Secrets werden weder überschrieben noch gelöscht.
+- **Löschen:** `previews: false` entfernt den eigenen `cfd:preview`.
+  Verwaiste `cfd:`-Trigger (Site oder Block entfernt) löscht der Apply nur mit
+  `builds_allow_delete: true`.
+- `_defaults.json` wird wie bei `domains` flach gemischt, `env` schlüsselweise.
+
+**Was von Hand bleibt:** Die Cloudflare-GitHub-App braucht Zugriff auf das
+Repo, und der Worker muss existieren. Die Repo-Verbindung findet der Abgleich
+an einem bestehenden Trigger im Account oder legt sie an; für ein privates
+Repo ohne bestehende Verbindung braucht er dafür ein optionales
+`BUILDS_GITHUB_TOKEN` (Metadata: Read). Ein Build-Token legt er nie an – er
+nimmt das eines vorhandenen Triggers, `<worker> build token` oder den Namen aus
+`builds.buildTokenName`. Fehlt etwas davon, bricht der Plan mit Anleitung ab.
+
+**Token-Rechte zusätzlich**, nur wenn eine Site `builds` nutzt:
+
+| Scope   | Permission                     | Level | Wofür                         |
+| ------- | ------------------------------ | ----- | ----------------------------- |
+| Account | Workers Builds Configuration   | Edit  | Trigger, Variablen, Repo-Verbindung |
+| Account | Workers Scripts                | Read  | Script-Tag des Workers (in *Edit* enthalten) |
+
+Wahlweise als eigenes Secret `CLOUDFLARE_BUILDS_API_TOKEN`, sonst gilt
+`CLOUDFLARE_API_TOKEN`. Ohne `builds`-Block ist der Abgleich ein No-Op ohne
+API-Aufruf; bestehende Config-Repos merken nichts davon.
+
 ## Warum überhaupt Terraform
 
 **Warum kein Redirect im Worker?** Würde funktionieren, macht aber jeden

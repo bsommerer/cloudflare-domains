@@ -41,11 +41,21 @@ on:
         description: GitHub-Environment für den Apply-Job (z. B. für ein Approval-Gate)
         type: string
         default: ""
+      builds_allow_delete:
+        description: Verwaiste `cfd:`-Trigger der Workers Builds löschen (Site oder builds-Block entfernt)
+        type: boolean
+        default: false
     secrets:
       CLOUDFLARE_API_TOKEN:
         required: true
       CLOUDFLARE_ACCOUNT_ID:
         required: true
+      # Beide optional, nur für `builds`-Blöcke – siehe README, Abschnitt
+      # "Workers Builds". Ohne eigenes Token gilt CLOUDFLARE_API_TOKEN.
+      CLOUDFLARE_BUILDS_API_TOKEN:
+        required: false
+      BUILDS_GITHUB_TOKEN:
+        required: false
 
 # Zwei parallele Applies würden sich um denselben State streiten.
 concurrency:
@@ -146,3 +156,21 @@ jobs:
             terraform output -json sites
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # Workers Builds hat keine Terraform-Resource, deshalb ein eigener
+      # Abgleich nach dem Apply. Ohne `builds`-Block in den Site-Dateien ein
+      # No-Op ohne einen einzigen API-Aufruf.
+      - name: Workers Builds abgleichen
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_BUILDS_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          BUILDS_GITHUB_TOKEN: ${{ secrets.BUILDS_GITHUB_TOKEN }}
+          BUILDS_SUMMARY_OUT: ${{ runner.temp }}/builds.md
+          ALLOW_DELETE: ${{ inputs.builds_allow_delete && '--allow-delete' || '' }}
+        run: |
+          set +e
+          node engine/scripts/reconcile-builds/reconcile-builds.mjs apply \
+            --sites-dir "config/${{ inputs.sites_dir }}" $ALLOW_DELETE
+          rc=$?
+          [ -f "$BUILDS_SUMMARY_OUT" ] && cat "$BUILDS_SUMMARY_OUT" >> "$GITHUB_STEP_SUMMARY"
+          exit $rc

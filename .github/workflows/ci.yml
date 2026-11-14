@@ -40,6 +40,11 @@ jobs:
       - name: Tests der wrangler-Prüfung
         run: node --test scripts/check-wrangler/test/*.test.mjs
 
+      # Abgleich der Workers Builds (kein Terraform): Planlogik gegen eine
+      # nachgebaute API, ohne Netz.
+      - name: Tests reconcile-builds
+        run: node --test scripts/reconcile-builds/test/*.test.mjs
+
       - name: Validate examples
         run: |
           for dir in examples/*/; do
