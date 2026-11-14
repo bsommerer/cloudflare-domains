@@ -224,6 +224,28 @@ locals {
   }
 }
 
+# Dasselbe für das Redirect-Ruleset einer Zone. Cloudflare erlaubt pro Zone und
+# Phase genau ein Entry-Point-Ruleset – existiert schon eins (von Hand angelegt,
+# oder als leerer Rest, nachdem die letzte Regel im Dashboard gelöscht wurde),
+# scheitert das Anlegen mit „exceeded maximum number of zone rulesets“.
+#
+# Übernommen wird nur für Zonen, in denen die Engine überhaupt Regeln setzt.
+# Achtung, gewollt: Ab der Übernahme gehört das Ruleset der Engine. Von Hand
+# angelegte Regeln darin zeigt der Plan als Löschung – sichtbar, bevor etwas
+# passiert.
+locals {
+  redirect_ruleset_candidates = {
+    for zn, _ in local.rules_by_zone : zn => [
+      for r in lookup(var.existing_rulesets, zn, []) : r.id
+      if r.kind == "zone" && r.phase == "http_request_dynamic_redirect"
+    ]
+  }
+
+  ruleset_adoptions = {
+    for zn, ids in local.redirect_ruleset_candidates : zn => ids[0] if length(ids) > 0
+  }
+}
+
 #############################################
 # 5. Befunde für die Guards im Root
 #############################################

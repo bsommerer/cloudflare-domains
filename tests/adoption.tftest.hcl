@@ -119,3 +119,87 @@ run "adoption_is_empty_without_input" {
     error_message = "Ohne bekannte Bestandsdomains darf die Übernahme leer bleiben."
   }
 }
+
+# Redirect-Ruleset: existiert in der Zone schon eins (von Hand angelegt oder als
+# leerer Rest), muss es übernommen werden – Cloudflare erlaubt pro Zone und
+# Phase nur ein Entry-Point-Ruleset.
+
+run "existing_redirect_ruleset_is_adopted" {
+  module { source = "./modules/site-plan" }
+
+  variables {
+    existing_rulesets = {
+      "kunde.de" = [
+        { id = "rs-waf", kind = "zone", phase = "http_request_firewall_custom" },
+        { id = "rs-redirect", kind = "zone", phase = "http_request_dynamic_redirect" },
+      ]
+    }
+
+    sites = {
+      kunde = {
+        workerName      = "kunde"
+        canonicalDomain = "kunde.de"
+        redirectWWW     = true
+      }
+    }
+  }
+
+  assert {
+    condition     = output.ruleset_adoptions == { "kunde.de" = "rs-redirect" }
+    error_message = "Das bestehende Redirect-Ruleset der Zone muss übernommen werden – und nur dieses."
+  }
+}
+
+run "ruleset_of_other_kind_or_phase_is_ignored" {
+  module { source = "./modules/site-plan" }
+
+  variables {
+    existing_rulesets = {
+      "kunde.de" = [
+        # Managed Rulesets und andere Phasen gehören nicht der Engine.
+        { id = "rs-managed", kind = "managed", phase = "http_request_dynamic_redirect" },
+        { id = "rs-config", kind = "zone", phase = "http_config_settings" },
+      ]
+    }
+
+    sites = {
+      kunde = {
+        workerName      = "kunde"
+        canonicalDomain = "kunde.de"
+        redirectWWW     = true
+      }
+    }
+  }
+
+  assert {
+    condition     = length(output.ruleset_adoptions) == 0
+    error_message = "Nur ein Zonen-Ruleset der Redirect-Phase darf übernommen werden."
+  }
+}
+
+run "ruleset_without_engine_rules_is_left_alone" {
+  module { source = "./modules/site-plan" }
+
+  variables {
+    # kunde.com hat ein Redirect-Ruleset, die Engine setzt dort aber keine
+    # Regel. Es zu übernehmen hieße, fremde Regeln zu löschen.
+    existing_rulesets = {
+      "kunde.com" = [
+        { id = "rs-fremd", kind = "zone", phase = "http_request_dynamic_redirect" },
+      ]
+    }
+
+    sites = {
+      kunde = {
+        workerName      = "kunde"
+        canonicalDomain = "kunde.de"
+        redirectWWW     = false
+      }
+    }
+  }
+
+  assert {
+    condition     = length(output.ruleset_adoptions) == 0
+    error_message = "Ohne Engine-Regeln in der Zone wird kein Ruleset angefasst."
+  }
+}
