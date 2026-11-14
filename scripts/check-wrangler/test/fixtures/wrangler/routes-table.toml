@@ -1,0 +1,6 @@
+name = "kunde-xy"
+workers_dev = false
+
+[[routes]]
+pattern = "kunde-xy.de"
+custom_domain = true

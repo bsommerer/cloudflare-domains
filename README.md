@@ -264,6 +264,41 @@ doppelte Indexierung nur der `<link rel="canonical">`-Tag der Seite.
 
 </details>
 
+<details>
+<summary><b>wrangler-Konfliktprüfung — damit der nächste Deploy nichts zurückdreht</b></summary>
+
+Die Worker werden aus ihren eigenen Repos per `wrangler deploy` ausgerollt, und
+die wrangler-Datei gewinnt dabei gegen die Engine: Fehlt `workers_dev`, schaltet
+jeder Deploy den workers.dev-Hostnamen wieder ein; `routes` oder `custom_domain`
+kollidieren mit der Custom Domain der Engine. Trägt die Site-Datei das Repo
+ein, prüft der Validate-Workflow das im PR:
+
+```json
+{ "repo": "kunde-xy-org/kunde-xy-website", "repoRef": "main", "wranglerConfig": "wrangler.toml", "domains": { "…": "…" } }
+```
+
+`repoRef` (Default: Default-Branch) und `wranglerConfig` (Default
+`wrangler.toml`; `wrangler.jsonc`/`.json` gehen auch) sind optional. Fehler gibt
+es, wenn
+
+1. `name` ≠ `domains.workerName`,
+2. `disableWorkersDev` gesetzt ist, `workers_dev` aber nicht explizit `false`,
+3. `routes`/`route` gesetzt sind (top-level oder in `[env.*]`), obwohl die
+   Engine die Domains der Site verwaltet.
+
+Sites ohne `repo` oder mit `domains.enabled != true` werden übersprungen. Die
+Ausgabe kommt als Annotation an der Site-Datei und als Tabelle in der
+Job-Summary. Lokal: `node scripts/check-wrangler/cli.mjs <sites-dir> [--allow-missing]`
+(Node ≥ 20, keine Abhängigkeiten).
+
+Private Worker-Repos liest der `GITHUB_TOKEN` des Config-Repos nicht. Dafür gibt
+es das optionale Secret `REPO_READ_TOKEN` (fine-grained PAT, **Contents: Read**
+auf die Worker-Repos), das der Aufrufer durchreicht. Ohne das Secret läuft die
+Prüfung mit `--allow-missing`: nicht lesbare Repos sind dann nur eine Warnung.
+Bestehende Aufrufer brauchen keine Änderung.
+
+</details>
+
 ## Warum überhaupt Terraform
 
 **Warum kein Redirect im Worker?** Würde funktionieren, macht aber jeden

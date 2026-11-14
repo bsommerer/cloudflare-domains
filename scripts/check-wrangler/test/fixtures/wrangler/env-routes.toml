@@ -1,0 +1,9 @@
+name = "kunde-xy"
+workers_dev = false
+
+[env.production]
+routes = [{ pattern = "kunde-xy.de", custom_domain = true }]
+
+[[env.preview.routes]]
+pattern = "preview.kunde-xy.de"
+custom_domain = true

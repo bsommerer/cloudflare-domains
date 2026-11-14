@@ -1,0 +1,12 @@
+# sauber: Name passt, workers_dev aus, keine Routen
+name = "kunde-xy"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+workers_dev = false
+
+[assets]
+directory = "./dist"
+
+[env.staging]
+name = "kunde-xy-staging"
+vars = { STAGE = "x" }

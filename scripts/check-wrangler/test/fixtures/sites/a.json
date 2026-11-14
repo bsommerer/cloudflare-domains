@@ -1,0 +1,4 @@
+{
+  "repo": "bsommerer/kunde-xy",
+  "domains": { "enabled": true, "workerName": "kunde-xy", "canonicalDomain": "kunde-xy.de" }
+}

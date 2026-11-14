@@ -18,6 +18,7 @@ name: Validate sites (reusable)
 #       secrets:
 #         CLOUDFLARE_API_TOKEN:  ${{ secrets.CLOUDFLARE_API_TOKEN }}
 #         CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+#         REPO_READ_TOKEN:       ${{ secrets.REPO_READ_TOKEN }}   # optional, siehe README
 
 on:
   workflow_call:
@@ -43,8 +44,50 @@ on:
         required: true
       CLOUDFLARE_ACCOUNT_ID:
         required: true
+      REPO_READ_TOKEN:
+        description: >-
+          GitHub-Token mit Contents: Read auf die Worker-Repos (`repo` in den
+          Site-Dateien). Ohne das Secret läuft die wrangler-Prüfung nur mit
+          Warnungen – private Repos sind mit dem GITHUB_TOKEN des Config-Repos
+          nicht lesbar.
+        required: false
 
 jobs:
+  # Eigener Job: braucht weder Terraform noch Cloudflare-Zugang und soll auch
+  # dann Feedback geben, wenn der Plan scheitert.
+  wrangler:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Config-Repo auschecken (Caller)
+        uses: actions/checkout@v4
+        with:
+          path: config
+
+      - name: Engine auschecken
+        uses: actions/checkout@v4
+        with:
+          repository: bsommerer/cloudflare-domains
+          ref: ${{ inputs.engine_ref }}
+          path: engine
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: wrangler-Konfiguration gegen die Sites prüfen
+        working-directory: config
+        env:
+          REPO_READ_TOKEN: ${{ secrets.REPO_READ_TOKEN }}
+        run: |
+          # Ohne Token sind private Repos nicht lesbar: dann nur warnen,
+          # statt jeden PR des Config-Repos rot zu färben.
+          FLAGS=""
+          if [ -z "$REPO_READ_TOKEN" ]; then
+            echo "::notice::REPO_READ_TOKEN nicht gesetzt - nicht lesbare Repos werden nur als Warnung gemeldet."
+            FLAGS="--allow-missing"
+          fi
+          node ../engine/scripts/check-wrangler/cli.mjs "${{ inputs.sites_dir }}" $FLAGS
+
   plan:
     runs-on: ubuntu-latest
     steps:

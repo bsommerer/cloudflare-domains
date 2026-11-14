@@ -1,6 +1,7 @@
 {
   "name": "Kunde XY",
   "enabled": true,
+  "repo": "kunde-xy-org/kunde-xy-website",
 
   "domains": {
     "enabled": true,

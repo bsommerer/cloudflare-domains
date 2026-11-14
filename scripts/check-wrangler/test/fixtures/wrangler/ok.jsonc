@@ -1,0 +1,6 @@
+{
+  // Kommentar mit "Anführungszeichen"
+  "name": "kunde-xy",
+  "workers_dev": false, /* Block */
+  "assets": { "directory": "./dist", },
+}
