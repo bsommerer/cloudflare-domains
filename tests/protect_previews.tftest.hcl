@@ -363,6 +363,79 @@ run "missing_worker_id_stays_empty_instead_of_failing" {
 # Root: Access-Ressourcen
 #############################################
 
+run "disabled_workers_dev_keeps_protected_previews_on" {
+  command = plan
+
+  override_module {
+    target = module.plan
+    outputs = {
+      sites = {
+        a = { workerName = "web-a", canonicalDomain = "eins.de", redirectDomains = [], redirectStatusCode = 301 }
+        b = { workerName = "web-b", canonicalDomain = "zwei.de", redirectDomains = [], redirectStatusCode = 301 }
+      }
+      zone_name_for        = { "eins.de" = "eins.de", "zwei.de" = "zwei.de" }
+      zone_id_for          = { "eins.de" = "id-eins", "zwei.de" = "id-zwei" }
+      zone_ids_by_name     = { "eins.de" = "id-eins", "zwei.de" = "id-zwei" }
+      managed_zones        = ["eins.de", "zwei.de"]
+      redirect_records     = {}
+      rules_by_zone        = {}
+      https_zones          = []
+      workers_dev_disabled = ["web-a", "web-b"]
+
+      custom_domain_adoptions = {}
+      ruleset_adoptions       = {}
+      redirect_ruleset_names  = {}
+
+      # Security-Header sind hier nicht Thema.
+      ruleset_lookup_zones       = []
+      security_headers           = {}
+      security_rules_by_zone     = {}
+      security_ruleset_adoptions = {}
+      security_ruleset_names     = {}
+      security_findings          = { invalid_hsts = [] }
+
+      findings = {
+        unmatched_domains      = []
+        duplicate_canonicals   = []
+        duplicate_redirects    = []
+        canonical_and_redirect = []
+        self_redirecting       = []
+        unknown_workers        = []
+        invalid_status         = []
+      }
+      preview_protection = {
+        "web-a" = { sites = ["a"], allowedEmails = ["ich@eins.de"], allowedEmailDomains = ["firma.de"] }
+      }
+      preview_applications = {
+        "web-a" = {
+          worker_id = "0000000000000000000000000000000a"
+          include = [
+            { email = { email = "ich@eins.de" } },
+            { email_domain = { domain = "firma.de" } },
+          ]
+        }
+      }
+      preview_findings = {
+        preview_without_allowlist     = []
+        invalid_preview_emails        = []
+        invalid_preview_email_domains = []
+      }
+    }
+  }
+
+  # Beim Abschalten von workers.dev schaltet die API ohne ausdrückliches
+  # `previews_enabled` auch die Previews ab – dann gäbe es nichts zu schützen.
+  assert {
+    condition     = cloudflare_workers_script_subdomain.canonical["web-a"].enabled == false && cloudflare_workers_script_subdomain.canonical["web-a"].previews_enabled == true
+    error_message = "workers.dev aus, die geschützten Previews aber ausdrücklich an."
+  }
+
+  assert {
+    condition     = cloudflare_workers_script_subdomain.canonical["web-b"].enabled == false
+    error_message = "Ohne protectPreviews bleibt es bei workers.dev aus."
+  }
+}
+
 run "root_creates_preview_worker_application_and_policy" {
   command = plan
 

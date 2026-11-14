@@ -48,7 +48,7 @@ test('Testseite: alle Features ergeben die erwarteten Prüfungen', () => {
   assert.deepEqual(headers.exact, { 'Referrer-Policy': 'no-referrer' })
 
   assert.deepEqual(byType(checks, 'workers-dev'), [{ type: 'workers-dev', worker: 'cfd-testsite' }])
-  assert.deepEqual(byType(checks, 'previews'), [{ type: 'previews', worker: 'cfd-testsite' }])
+  assert.deepEqual(byType(checks, 'previews'), [{ type: 'previews', worker: 'cfd-testsite', engineKeepsOn: true }])
 
   const builds = byType(checks, 'builds')
   assert.deepEqual(builds.map(b => b.desired.trigger_name), ['cfd:production', 'cfd:preview'])

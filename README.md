@@ -151,8 +151,8 @@ Worker-Liste auf einen Plan ab, mehr nicht. Kein Provider, keine API, keine
 Mocks:
 
 ```bash
-terraform test                         # 76 Fälle, keine Credentials
-node --test scripts/*/test/*.test.mjs  # 62 Fälle der Node-Skripte
+terraform test                         # 77 Fälle, keine Credentials
+node --test scripts/*/test/*.test.mjs  # 63 Fälle der Node-Skripte
 ```
 
 Der Root verdrahtet danach nur noch Plan → Ressourcen. Der Umweg ist der ganze
@@ -336,7 +336,10 @@ workers.dev. Dazu eine wiederverwendbare Policy mit der Allowlist. Produktion
 - Ob Previews **überhaupt** ausgeliefert werden, steuert `preview_urls` in der
   `wrangler.toml` — wrangler setzt den Wert bei jedem Deploy. Die Engine fasst
   ihn bewusst nicht an, sonst stritten sich zwei Quellen. Sie schützt nur, was
-  wrangler ausrollt.
+  wrangler ausrollt. Einzige Ausnahme ist `disableWorkersDev`: Cloudflare
+  schaltet beim Abschalten von workers.dev die Previews mit ab, sofern man
+  nichts anderes angibt. Mit `protectPreviews` lässt die Engine sie deshalb
+  ausdrücklich an, ohne `protectPreviews` bleiben sie aus.
 - Hat jemand den Schutz schon im Dashboard eingeschaltet, existiert dort eine
   zweite Application für denselben Worker. Vor dem ersten Apply im Dashboard
   wieder abschalten — die Engine übernimmt sie nicht.
@@ -565,7 +568,7 @@ ist der `plan` — und er ist der Review-Gegenstand im PR.
 
 ## Status
 
-76 `terraform test`-Fälle, 62 `node --test`-Fälle der Skripte, `terraform validate` und CI grün.
+77 `terraform test`-Fälle, 63 `node --test`-Fälle der Skripte, `terraform validate` und CI grün.
 
 In Produktion gelaufen: erster Apply gegen ein echtes Cloudflare-Konto
 inklusive Übernahme einer bestehenden Custom Domain, R2-Backend mit

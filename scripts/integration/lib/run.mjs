@@ -91,7 +91,11 @@ async function attempt(c, ctx) {
   if (c.type === 'previews') {
     if (!ctx.workersSubdomain) return skip('workers.dev-Subdomain des Accounts unbekannt')
     const sub = await ctx.api.scriptSubdomain(c.worker)
-    if (sub.previews_enabled === false) return skip('Preview-URLs sind am Worker abgeschaltet (preview_urls) – nichts zu schützen')
+    if (sub.previews_enabled === false) {
+      return c.engineKeepsOn
+        ? fail('Preview-URLs sind abgeschaltet, obwohl die Engine sie bei disableWorkersDev + protectPreviews anlässt')
+        : skip('Preview-URLs sind am Worker abgeschaltet (preview_urls) – nichts zu schützen')
+    }
     const urls = previewUrls(c.worker, ctx.workersSubdomain, await ctx.api.versions(c.worker))
     if (!urls) return skip('keine Version mit Preview vorhanden')
     const results = []
