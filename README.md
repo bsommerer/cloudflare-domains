@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/bsommerer/cloudflare-domains/actions/workflows/ci.yml/badge.svg)](https://github.com/bsommerer/cloudflare-domains/actions/workflows/ci.yml)
 ![Terraform](https://img.shields.io/badge/terraform-%E2%89%A5%201.7-7B42BC)
-![Tests](https://img.shields.io/badge/terraform%20test-40%20passing-2ea44f)
+![Tests](https://img.shields.io/badge/terraform%20test-76%20passing-2ea44f)
 
 Jede Website, die man betreut, schleppt einen Rattenschwanz mit: die Domain, auf
 der sie läuft, die alte Domain von vor dem Rebranding, die `.com` neben der
@@ -151,7 +151,8 @@ Worker-Liste auf einen Plan ab, mehr nicht. Kein Provider, keine API, keine
 Mocks:
 
 ```bash
-terraform test        # 40 Fälle, keine Credentials
+terraform test                         # 76 Fälle, keine Credentials
+node --test scripts/*/test/*.test.mjs  # 37 Fälle der Node-Skripte
 ```
 
 Der Root verdrahtet danach nur noch Plan → Ressourcen. Der Umweg ist der ganze
@@ -488,7 +489,7 @@ ist der `plan` — und er ist der Review-Gegenstand im PR.
 
 ## Status
 
-37 `terraform test`-Fälle, `terraform validate` und CI grün.
+76 `terraform test`-Fälle, 37 `node --test`-Fälle der Skripte, `terraform validate` und CI grün.
 
 In Produktion gelaufen: erster Apply gegen ein echtes Cloudflare-Konto
 inklusive Übernahme einer bestehenden Custom Domain, R2-Backend mit
