@@ -52,6 +52,15 @@ output "custom_domain_adoptions" {
   value       = local.custom_domain_adoptions
 }
 
+output "ruleset_adoptions" {
+  description = <<-EOT
+    Zonenname -> ID des bereits bestehenden Redirect-Rulesets. Nur Zonen, in
+    denen die Engine Weiterleitungen setzt und schon ein Ruleset der Phase
+    `http_request_dynamic_redirect` existiert.
+  EOT
+  value       = local.ruleset_adoptions
+}
+
 output "findings" {
   description = "Konfigurationsprobleme, die der Root als Precondition hart abbricht."
   value       = local.findings

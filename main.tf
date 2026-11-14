@@ -24,6 +24,15 @@ data "cloudflare_workers_custom_domains" "all" {
   max_items  = local.custom_domain_page_size
 }
 
+# Grundlage der Ruleset-Übernahme: bestehende Rulesets, aber nur in Zonen, in
+# denen die Engine Weiterleitungen setzt – nicht für jede Zone im Account.
+data "cloudflare_rulesets" "zone" {
+  for_each = local.rules_by_zone
+
+  zone_id   = local.zone_ids_by_name[each.key]
+  max_items = local.ruleset_page_size
+}
+
 #############################################
 # Planung
 #############################################
@@ -43,6 +52,13 @@ module "plan" {
 
   existing_custom_domains = {
     for d in data.cloudflare_workers_custom_domains.all.result : lower(d.hostname) => d.id
+  }
+
+  # Hängt nur an den Zonen aus dem Plan, nicht an dieser Eingabe – kein Zyklus.
+  existing_rulesets = {
+    for zn, d in data.cloudflare_rulesets.zone : zn => [
+      for r in d.result : { id = r.id, kind = r.kind, phase = r.phase }
+    ]
   }
 }
 
@@ -142,6 +158,16 @@ resource "cloudflare_ruleset" "redirect" {
   ]
 
   depends_on = [cloudflare_dns_record.redirect]
+}
+
+# Bestandsübernahme wie bei den Custom Domains: ein schon vorhandenes
+# Redirect-Ruleset der Zone wird importiert statt neu angelegt. Danach gehört es
+# der Engine – fremde Regeln darin erscheinen im Plan als Löschung.
+import {
+  for_each = local.ruleset_adoptions
+
+  to = cloudflare_ruleset.redirect[each.key]
+  id = "zones/${local.zone_ids_by_name[each.key]}/${each.value}"
 }
 
 #############################################

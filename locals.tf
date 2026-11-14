@@ -7,6 +7,7 @@ locals {
   zone_page_size          = 1000
   worker_page_size        = 1000
   custom_domain_page_size = 1000
+  ruleset_page_size       = 100
 
   sites_dir = var.sites_dir == null ? null : (
     startswith(var.sites_dir, "/") ? var.sites_dir : "${path.root}/${var.sites_dir}"
@@ -36,4 +37,5 @@ locals {
   workers_dev_disabled = module.plan.workers_dev_disabled
 
   custom_domain_adoptions = module.plan.custom_domain_adoptions
+  ruleset_adoptions       = module.plan.ruleset_adoptions
 }

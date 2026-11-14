@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/bsommerer/cloudflare-domains/actions/workflows/ci.yml/badge.svg)](https://github.com/bsommerer/cloudflare-domains/actions/workflows/ci.yml)
 ![Terraform](https://img.shields.io/badge/terraform-%E2%89%A5%201.7-7B42BC)
-![Tests](https://img.shields.io/badge/terraform%20test-37%20passing-2ea44f)
+![Tests](https://img.shields.io/badge/terraform%20test-40%20passing-2ea44f)
 
 Jede Website, die man betreut, schleppt einen Rattenschwanz mit: die Domain, auf
 der sie läuft, die alte Domain von vor dem Rebranding, die `.com` neben der
@@ -99,7 +99,7 @@ Worker-Liste auf einen Plan ab, mehr nicht. Kein Provider, keine API, keine
 Mocks:
 
 ```bash
-terraform test        # 37 Fälle, keine Credentials
+terraform test        # 40 Fälle, keine Credentials
 ```
 
 Der Root verdrahtet danach nur noch Plan → Ressourcen. Der Umweg ist der ganze
@@ -157,6 +157,15 @@ Code — sie verknüpft. Terraform ≥ 1.7, für den R2-State ≥ 1.10.
 **Bestehende Seiten** brauchen keinen Sonderweg. Ist die kanonische Domain
 schon von Hand mit dem Worker verknüpft, importiert die Engine sie, statt am
 „existiert bereits" zu scheitern — Migration ist ein reiner Config-PR.
+
+Dasselbe gilt für das **Redirect-Ruleset** einer Zone. Davon erlaubt Cloudflare
+pro Zone nur eins, und es bleibt sogar als leere Hülle bestehen, nachdem die
+letzte Regel im Dashboard gelöscht wurde — ein Neuanlegen scheitert dann mit
+*„exceeded maximum number of zone rulesets“*. Die Engine übernimmt ein
+vorhandenes Ruleset deshalb per `import`, aber nur in Zonen, in denen sie selbst
+Weiterleitungen setzt. Ab dann gehört es ihr: von Hand angelegte Regeln darin
+erscheinen im Plan als Löschung, sichtbar im PR-Kommentar, bevor etwas
+passiert.
 
 <details>
 <summary><b>API-Token — welche Rechte, und eine Falle</b></summary>
