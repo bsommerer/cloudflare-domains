@@ -57,7 +57,7 @@ module "plan" {
   # Hängt nur an den Zonen aus dem Plan, nicht an dieser Eingabe – kein Zyklus.
   existing_rulesets = {
     for zn, d in data.cloudflare_rulesets.zone : zn => [
-      for r in d.result : { id = r.id, kind = r.kind, phase = r.phase }
+      for r in d.rulesets : { id = r.id, kind = r.kind, phase = r.phase, name = r.name }
     ]
   }
 }
@@ -129,8 +129,9 @@ resource "cloudflare_dns_record" "redirect" {
 resource "cloudflare_ruleset" "redirect" {
   for_each = local.rules_by_zone
 
+  # Übernommene Rulesets behalten ihren Namen, sonst ersetzt der Provider sie.
   zone_id     = local.zone_ids_by_name[each.key]
-  name        = "canonical-redirects"
+  name        = local.redirect_ruleset_names[each.key]
   description = "Kanonische Weiterleitungen (Terraform)"
   kind        = "zone"
   phase       = "http_request_dynamic_redirect"

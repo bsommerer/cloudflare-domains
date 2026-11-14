@@ -26,14 +26,17 @@ variable "existing_custom_domains" {
 variable "existing_rulesets" {
   description = <<-EOT
     Bereits vorhandene Rulesets je Zone als Zonenname -> Liste von
-    { id, kind, phase }. Grundlage für die Übernahme eines Redirect-Rulesets,
-    das schon vor der Engine existierte: Cloudflare erlaubt pro Zone und Phase
-    nur ein Entry-Point-Ruleset, ein zweites Anlegen scheitert.
+    { id, kind, phase, name }. Grundlage für die Übernahme eines
+    Redirect-Rulesets, das schon vor der Engine existierte: Cloudflare erlaubt
+    pro Zone und Phase nur ein Entry-Point-Ruleset, ein zweites Anlegen
+    scheitert. `name` wird beim Übernehmen beibehalten – eine Namensänderung
+    erzwingt beim Provider ein Ersetzen des Rulesets.
   EOT
   type = map(list(object({
     id    = string
     kind  = string
     phase = string
+    name  = optional(string)
   })))
   default = {}
 }

@@ -236,13 +236,22 @@ locals {
 locals {
   redirect_ruleset_candidates = {
     for zn, _ in local.rules_by_zone : zn => [
-      for r in lookup(var.existing_rulesets, zn, []) : r.id
+      for r in lookup(var.existing_rulesets, zn, []) : r
       if r.kind == "zone" && r.phase == "http_request_dynamic_redirect"
     ]
   }
 
   ruleset_adoptions = {
-    for zn, ids in local.redirect_ruleset_candidates : zn => ids[0] if length(ids) > 0
+    for zn, rs in local.redirect_ruleset_candidates : zn => rs[0].id if length(rs) > 0
+  }
+
+  # Der Name eines übernommenen Rulesets bleibt, wie er ist: `name` erzwingt
+  # beim Provider ein Ersetzen. Ein von Cloudflare angelegtes Ruleset heißt
+  # „default“ – mit fest verdrahtetem Namen würde der Import also sofort
+  # wieder zerstört und neu angelegt, samt Lücke ohne Weiterleitung.
+  redirect_ruleset_names = {
+    for zn, rs in local.redirect_ruleset_candidates :
+    zn => try(coalesce(rs[0].name, "canonical-redirects"), "canonical-redirects")
   }
 }
 
