@@ -33,6 +33,13 @@ jobs:
       - name: Tests
         run: terraform test
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Tests der wrangler-Prüfung
+        run: node --test scripts/check-wrangler/test/*.test.mjs
+
       - name: Validate examples
         run: |
           for dir in examples/*/; do

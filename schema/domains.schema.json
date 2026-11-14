@@ -6,7 +6,26 @@
 
   "type": "object",
   "properties": {
-    "domains": { "$ref": "#/$defs/domains" }
+    "domains": { "$ref": "#/$defs/domains" },
+
+    "repo": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$",
+      "description": "GitHub-Repo des Workers (`owner/name`). Die Engine liest es nicht fuer Terraform; die Pruefung scripts/check-wrangler vergleicht darin die wrangler-Datei mit dem domains-Block (Worker-Name, workers_dev, routes). Dasselbe Feld nutzen andere Bloecke (z. B. Workers Builds)."
+    },
+
+    "repoRef": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Branch, Tag oder Commit in `repo`. Ohne Angabe: Default-Branch."
+    },
+
+    "wranglerConfig": {
+      "type": "string",
+      "minLength": 1,
+      "default": "wrangler.toml",
+      "description": "Pfad der wrangler-Datei in `repo` (wrangler.toml, wrangler.jsonc oder wrangler.json)."
+    }
   },
 
   "$defs": {
