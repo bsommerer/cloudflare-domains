@@ -51,6 +51,12 @@ on:
           Warnungen – private Repos sind mit dem GITHUB_TOKEN des Config-Repos
           nicht lesbar.
         required: false
+      # Beide optional, nur für `builds`-Blöcke – siehe README, Abschnitt
+      # "Workers Builds". Ohne eigenes Token gilt CLOUDFLARE_API_TOKEN.
+      CLOUDFLARE_BUILDS_API_TOKEN:
+        required: false
+      BUILDS_GITHUB_TOKEN:
+        required: false
 
 jobs:
   # Eigener Job: braucht weder Terraform noch Cloudflare-Zugang und soll auch
@@ -198,3 +204,36 @@ jobs:
           gh pr comment "${{ github.event.pull_request.number }}" \
             --repo "${{ github.repository }}" \
             --body-file "${RUNNER_TEMP}/comment.md"
+
+      # Plan des Workers-Builds-Abgleichs: liest nur, schreibt nie. Läuft auch,
+      # wenn der Terraform-Plan scheitert – die beiden sind unabhängig.
+      - name: Workers-Builds-Plan
+        id: builds
+        if: ${{ !cancelled() }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_BUILDS_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          BUILDS_GITHUB_TOKEN: ${{ secrets.BUILDS_GITHUB_TOKEN }}
+          BUILDS_SUMMARY_OUT: ${{ runner.temp }}/builds.md
+        run: |
+          set +e
+          node engine/scripts/reconcile-builds/reconcile-builds.mjs plan \
+            --sites-dir "config/${{ inputs.sites_dir }}"
+          rc=$?
+          [ -f "$BUILDS_SUMMARY_OUT" ] && cat "$BUILDS_SUMMARY_OUT" >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
+
+      - name: Workers-Builds-Plan als PR-Kommentar
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          f="${RUNNER_TEMP}/builds.md"
+          # Ohne builds-Block kein Kommentar – bestehende Config-Repos sollen
+          # davon nichts merken.
+          [ -f "$f" ] || exit 0
+          grep -q 'Keine Site mit `builds`-Block' "$f" && exit 0
+          gh pr comment "${{ github.event.pull_request.number }}" \
+            --repo "${{ github.repository }}" \
+            --body-file "$f"

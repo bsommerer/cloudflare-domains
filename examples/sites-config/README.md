@@ -25,6 +25,7 @@ einer Engine gehört:
 | Key            | Engine                 |
 | -------------- | ---------------------- |
 | `domains`      | `cloudflare-domains`   |
+| `repo`, `builds` | `cloudflare-domains` (Workers Builds, siehe Engine-README) |
 | `contactForms` | `contact-form-worker`  |
 
 Verbindlich für jede Engine:

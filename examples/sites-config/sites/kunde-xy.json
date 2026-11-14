@@ -12,6 +12,13 @@
     "redirectWWW": true
   },
 
+  "builds": {
+    "enabled": true,
+    "buildCommand": "npm run build",
+    "previews": true,
+    "env": { "NODE_VERSION": "22" }
+  },
+
   "contactForms": {
     "kunde-xy": {
       "recipients": ["kontakt@kunde-xy.de"],
