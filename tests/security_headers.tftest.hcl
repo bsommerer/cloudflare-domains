@@ -487,6 +487,14 @@ run "root_plans_header_ruleset_and_adopts_existing" {
       security_ruleset_adoptions = {}
       security_ruleset_names     = { "kunde.de" = "default" }
       security_findings          = { invalid_hsts = [] }
+      # protectPreviews ist hier nicht Thema.
+      preview_protection   = {}
+      preview_applications = {}
+      preview_findings = {
+        preview_without_allowlist     = []
+        invalid_preview_emails        = []
+        invalid_preview_email_domains = []
+      }
       security_rules_by_zone = {
         "kunde.de" = [{
           slug        = "kunde"
