@@ -297,3 +297,13 @@ test('planEnv: ohne Konfiguration verschwinden nur eigene Variablen und der Mark
   )
   assert.deepEqual(r, { set: {}, remove: ['A', 'CFD_MANAGED_ENV'], skippedSecrets: [] })
 })
+
+test('fehlender GitHub-App-Zugriff wird als solcher erklärt', async () => {
+  const fetch = async () =>
+    new Response(
+      JSON.stringify({ success: false, errors: [{ code: 8000012, message: 'The project is linked to a repository that no longer exists' }] }),
+      { status: 404 },
+    )
+  const client = createClient({ token: 't', accountId: ACCOUNT, fetch })
+  await assert.rejects(client.upsertRepoConnection({}), /GitHub-App "Cloudflare Workers and Pages" hat vermutlich keinen Zugriff/)
+})
